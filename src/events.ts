@@ -1,4 +1,4 @@
-export type FieldEventType = "gathering" | "drift" | "color-parade";
+export type FieldEventType = "gathering" | "drift" | "color-parade" | "conga-line" | "golden-goober" | "rainbow-goober" | "gassy";
 
 interface TimedFieldEvent {
   readonly type: FieldEventType;
@@ -21,16 +21,35 @@ export interface ColorParadeEvent extends TimedFieldEvent {
   readonly type: "color-parade";
 }
 
-export type FieldEvent = GatheringEvent | DriftEvent | ColorParadeEvent;
+export interface CongaLineEvent extends TimedFieldEvent {
+  readonly type: "conga-line";
+}
+
+export interface GoldenGooberEvent extends TimedFieldEvent {
+  readonly type: "golden-goober";
+}
+
+export interface RainbowGooberEvent extends TimedFieldEvent {
+  readonly type: "rainbow-goober";
+}
+
+export interface GassyEvent extends TimedFieldEvent {
+  readonly type: "gassy";
+}
+
+export type FieldEvent = GatheringEvent | DriftEvent | ColorParadeEvent | CongaLineEvent | GoldenGooberEvent | RainbowGooberEvent | GassyEvent;
 
 const EVENT_DURATION_SECONDS = 30;
 const COLOR_PARADE_DURATION_SECONDS = 60;
+const CONGA_LINE_DURATION_SECONDS = 90;
+const GOLDEN_GOOBER_DURATION_SECONDS = 45;
+const GOLDEN_GOOBER_DURATION_VARIATION_SECONDS = 3;
 const EVENT_COOLDOWN_SECONDS = 15 * 60;
 const EVENT_CHECK_INTERVAL_SECONDS = 1;
 const EVENT_CHANCE_PER_CHECK = 1 / 240;
 const FIELD_EDGE_PADDING = 100;
 const INITIAL_EVENT_DELAY_SECONDS = 60;
-const RANDOM_EVENT_TYPES: readonly FieldEventType[] = ["gathering", "drift", "color-parade"];
+const RANDOM_EVENT_TYPES: readonly FieldEventType[] = ["gathering", "drift", "color-parade", "conga-line", "golden-goober", "gassy"];
 
 export class EventSystem {
   private activeEvent: FieldEvent | null = null;
@@ -58,7 +77,13 @@ export class EventSystem {
     } else {
       this.activeEvent = {
         type,
-        remainingSeconds: type === "color-parade" ? COLOR_PARADE_DURATION_SECONDS : EVENT_DURATION_SECONDS,
+        remainingSeconds: type === "golden-goober" || type === "rainbow-goober"
+          ? GOLDEN_GOOBER_DURATION_SECONDS + (Math.random() * 2 - 1) * GOLDEN_GOOBER_DURATION_VARIATION_SECONDS
+          : type === "color-parade"
+          ? COLOR_PARADE_DURATION_SECONDS
+          : type === "conga-line"
+            ? CONGA_LINE_DURATION_SECONDS
+            : EVENT_DURATION_SECONDS,
       };
     }
     this.checkElapsed = 0;
@@ -89,7 +114,10 @@ export class EventSystem {
     while (this.checkElapsed >= EVENT_CHECK_INTERVAL_SECONDS) {
       this.checkElapsed -= EVENT_CHECK_INTERVAL_SECONDS;
       if (Math.random() < EVENT_CHANCE_PER_CHECK) {
-        const type = RANDOM_EVENT_TYPES[Math.floor(Math.random() * RANDOM_EVENT_TYPES.length)];
+        const roll = Math.random() * (RANDOM_EVENT_TYPES.length + 0.5);
+        const type = roll < RANDOM_EVENT_TYPES.length
+          ? RANDOM_EVENT_TYPES[Math.floor(roll)]
+          : "rainbow-goober";
         this.trigger(type, width, height);
         break;
       }

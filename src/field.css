@@ -45,6 +45,9 @@ button { color: inherit; }
 .notebook-entry:hover { border-color: #52677a; background: rgba(67, 140, 255, .07); }
 .notebook-favorite-icon { width: 36px; border: 1px solid var(--line); background: var(--page); color: #e7c766; font-size: 17px; cursor: pointer; }
 .notebook-favorite-icon:hover, .notebook-favorite[aria-pressed="true"] { border-color: #8c7332; background: rgba(231, 199, 102, .1); }
+.notebook-add-loadout { width: 36px; border: 1px solid var(--line); background: var(--page); color: #8dbaff; font-size: 20px; line-height: 1; cursor: pointer; }
+.notebook-add-loadout:hover:not(:disabled) { border-color: #315b91; background: rgba(67, 140, 255, .12); }
+.notebook-add-loadout:disabled { opacity: .4; cursor: default; }
 .notebook-entry-info { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .notebook-entry-info strong { overflow: hidden; color: var(--text); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .notebook-entry-info span, .notebook-empty { color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: capitalize; }

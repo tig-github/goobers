@@ -14,6 +14,9 @@ export class ArenaRenderer {
   private theme: "dark" | "light" = "light";
   private readonly renderedHeadings = new Map<number, number>();
   private readonly portraitHeadings = new Map<number, number>();
+  private readonly rainbowTrails = new Map<number, { x: number; y: number; time: number; color: string; size: number }[]>();
+  private readonly gassyTrails = new Map<number, { x: number; y: number; time: number; color: string; size: number }[]>();
+  private readonly goldenSparkleTrails = new Map<number, { x: number; y: number; time: number; size: number; rotation: number }[]>();
   private previousRenderTime = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -44,7 +47,7 @@ export class ArenaRenderer {
     }
     for (const goober of goobers) {
       const previous = this.renderedHeadings.get(goober.id);
-      if (previous === undefined) this.renderedHeadings.set(goober.id, goober.heading);
+      if (goober.isRainbowSpinning || previous === undefined) this.renderedHeadings.set(goober.id, goober.heading);
       else {
         const difference = Math.atan2(Math.sin(goober.heading - previous), Math.cos(goober.heading - previous));
         this.renderedHeadings.set(goober.id, previous + difference * headingSmoothing);
@@ -74,7 +77,10 @@ export class ArenaRenderer {
     );
     context.clearRect(left, top, viewWidth, viewHeight);
     this.drawField();
-    if (fieldEvent) this.drawFieldEvent(fieldEvent, elapsed);
+    if (fieldEvent) this.drawFieldEvent(fieldEvent, elapsed, goobers);
+    this.drawRainbowTrail(fieldEvent, elapsed, goobers);
+    this.drawGassyTrails(fieldEvent, elapsed, goobers);
+    this.drawGoldenSparkleTrails(fieldEvent, elapsed, goobers);
     for (const goober of goobers) {
       this.drawGoober(goober, elapsed, this.context, this.renderedHeadings.get(goober.id) ?? goober.heading, goober.id === selectedId);
     }
@@ -161,7 +167,7 @@ export class ArenaRenderer {
     this.canvas.height = Math.round(bounds.height * pixelRatio);
   }
 
-  private drawFieldEvent(event: FieldEvent, elapsed: number): void {
+  private drawFieldEvent(event: FieldEvent, elapsed: number, goobers: Goober[]): void {
     if (event.type === "drift") {
       const context = this.context;
       const angle = Math.atan2(event.directionY, event.directionX);
@@ -189,6 +195,20 @@ export class ArenaRenderer {
       context.restore();
     } else if (event.type === "gathering") {
       this.drawGatheringMarker(event, elapsed);
+    } else if (event.type === "conga-line") {
+      const line = goobers.filter((goober) => goober.specialType !== "orderly").sort((a, b) => a.id - b.id);
+      if (line.length < 2) return;
+      const context = this.context;
+      context.save();
+      context.strokeStyle = this.theme === "light" ? "rgba(48, 91, 145, 0.48)" : "rgba(141, 186, 255, 0.55)";
+      context.lineWidth = 2;
+      context.setLineDash([8, 8]);
+      context.lineDashOffset = -elapsed * 12;
+      context.beginPath();
+      context.moveTo(line[0].x, line[0].y);
+      for (const goober of line.slice(1)) context.lineTo(goober.x, goober.y);
+      context.stroke();
+      context.restore();
     }
   }
 
@@ -212,6 +232,162 @@ export class ArenaRenderer {
     context.moveTo(-8, 0); context.lineTo(8, 0);
     context.moveTo(0, -8); context.lineTo(0, 8);
     context.stroke();
+    context.restore();
+  }
+
+  private drawRainbowTrail(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
+    const rainbows = goobers.filter((goober) => goober.specialType === "rainbow");
+    const activeIds = new Set(rainbows.map((goober) => goober.id));
+    for (const id of this.rainbowTrails.keys()) {
+      if (!activeIds.has(id)) this.rainbowTrails.delete(id);
+    }
+    if (rainbows.length === 0) return;
+    const colors = ["#ff304f", "#ff7628", "#ffc928", "#f7f044", "#45dd74", "#31c9d9", "#438aff", "#824dff", "#dd4aff"];
+    const trailDuration = fieldEvent?.type === "gassy" ? 2.8 : 1.4;
+    const context = this.context;
+    context.save();
+    for (const rainbow of rainbows) {
+      const trail = this.rainbowTrails.get(rainbow.id) ?? [];
+      const last = trail[trail.length - 1];
+      const leaving = Boolean(rainbow.isEventVisitorLeaving);
+      if (!last || elapsed - last.time >= 0.11) {
+        const particleCount = leaving
+          ? 10 + Math.floor(Math.random() * 10)
+          : Math.random() < 0.25 ? 2 : 1;
+        for (let index = 0; index < particleCount; index++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * 7;
+          trail.push({
+            x: rainbow.x + Math.cos(angle) * distance,
+            y: rainbow.y + Math.sin(angle) * distance,
+            time: elapsed,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: (6 + Math.random() * 4) * (leaving ? 3 : 1),
+          });
+        }
+      }
+      while (trail.length > 0 && elapsed - trail[0].time > trailDuration) trail.shift();
+      this.rainbowTrails.set(rainbow.id, trail);
+      for (const particle of trail) {
+        const age = elapsed - particle.time;
+        context.globalAlpha = Math.max(0, 1 - age / trailDuration) * 0.95;
+        context.fillStyle = particle.color;
+        context.shadowColor = particle.color;
+        context.shadowBlur = 9;
+        context.beginPath();
+        context.arc(particle.x, particle.y, particle.size * (1 - age * 0.25), 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+    context.shadowBlur = 0;
+    context.restore();
+  }
+
+  private drawGassyTrails(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
+    if (fieldEvent?.type !== "gassy") {
+      this.gassyTrails.clear();
+      return;
+    }
+    const activeIds = new Set(goobers.map((goober) => goober.id));
+    for (const id of this.gassyTrails.keys()) {
+      if (!activeIds.has(id)) this.gassyTrails.delete(id);
+    }
+    const context = this.context;
+    context.save();
+    for (const goober of goobers) {
+      if (goober.specialType === "golden") continue;
+      const trail = this.gassyTrails.get(goober.id) ?? [];
+      const last = trail[trail.length - 1];
+      if (!last || elapsed - last.time >= 0.11) {
+        const count = Math.random() < 0.25 ? 2 : 1;
+        for (let index = 0; index < count; index++) {
+          const angle = Math.random() * Math.PI * 2;
+          const distance = Math.random() * 5;
+          trail.push({
+            x: goober.x + Math.cos(angle) * distance,
+            y: goober.y + Math.sin(angle) * distance,
+            time: elapsed,
+            color: goober.color,
+            size: 6 + Math.random() * 4,
+          });
+        }
+      }
+      while (trail.length > 0 && elapsed - trail[0].time > 1.4) trail.shift();
+      this.gassyTrails.set(goober.id, trail);
+      for (const particle of trail) {
+        const age = elapsed - particle.time;
+        context.globalAlpha = Math.max(0, 1 - age / 1.4) * 0.95;
+        context.fillStyle = particle.color;
+        context.shadowColor = particle.color;
+        context.shadowBlur = 9;
+        context.beginPath();
+        context.arc(particle.x, particle.y, particle.size * (1 - age * 0.25), 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+    context.shadowBlur = 0;
+    context.restore();
+  }
+
+  private drawGoldenSparkleTrails(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
+    if (fieldEvent?.type !== "gassy") {
+      this.goldenSparkleTrails.clear();
+      return;
+    }
+    const goldenGoobers = goobers.filter((goober) => goober.specialType === "golden");
+    const activeIds = new Set(goldenGoobers.map((goober) => goober.id));
+    for (const id of this.goldenSparkleTrails.keys()) {
+      if (!activeIds.has(id)) this.goldenSparkleTrails.delete(id);
+    }
+    const context = this.context;
+    context.save();
+    context.shadowColor = "#ffd700";
+    context.shadowBlur = 12;
+    context.fillStyle = "#fff5b0";
+    for (const golden of goldenGoobers) {
+      const trail = this.goldenSparkleTrails.get(golden.id) ?? [];
+      const last = trail[trail.length - 1];
+      if (!last || elapsed - last.time >= 0.085) {
+        const heading = Math.hypot(golden.velocityX, golden.velocityY) > 0.1
+          ? Math.atan2(golden.velocityY, golden.velocityX)
+          : golden.heading;
+        const rearX = golden.x - Math.cos(heading) * 30 * golden.size;
+        const rearY = golden.y - Math.sin(heading) * 30 * golden.size;
+        const count = Math.random() < 0.35 ? 2 : 1;
+        for (let index = 0; index < count; index++) {
+          trail.push({
+            x: rearX + (Math.random() - 0.5) * 14,
+            y: rearY + (Math.random() - 0.5) * 14,
+            time: elapsed,
+            size: 3 + Math.random() * 4,
+            rotation: Math.random() * Math.PI,
+          });
+        }
+      }
+      while (trail.length > 0 && elapsed - trail[0].time > 1.1) trail.shift();
+      this.goldenSparkleTrails.set(golden.id, trail);
+      for (const particle of trail) {
+        const age = elapsed - particle.time;
+        const pulse = 0.65 + Math.sin(age * 24 + particle.rotation) * 0.35;
+        const size = particle.size * (1 - age * 0.3);
+        context.globalAlpha = Math.max(0, 1 - age / 1.1) * pulse;
+        context.save();
+        context.translate(particle.x, particle.y);
+        context.rotate(particle.rotation + age * 2);
+        context.beginPath();
+        context.moveTo(0, -size);
+        context.lineTo(size * 0.3, -size * 0.3);
+        context.lineTo(size, 0);
+        context.lineTo(size * 0.3, size * 0.3);
+        context.lineTo(0, size);
+        context.lineTo(-size * 0.3, size * 0.3);
+        context.lineTo(-size, 0);
+        context.lineTo(-size * 0.3, -size * 0.3);
+        context.closePath();
+        context.fill();
+        context.restore();
+      }
+    }
     context.restore();
   }
 
@@ -290,11 +466,33 @@ export class ArenaRenderer {
     context.save();
     context.translate(goober.x, goober.y + bob);
     context.rotate(heading - Math.PI / 2);
+    const goldFill = goober.specialType === "golden"
+      ? context.createLinearGradient(-pixel * 4.5, -pixel * 4.5, pixel * 4.5, pixel * 4.5)
+      : null;
+    if (goldFill) {
+      goldFill.addColorStop(0, "#fff6b0");
+      goldFill.addColorStop(0.24, "#ffd700");
+      goldFill.addColorStop(0.52, "#b8860b");
+      goldFill.addColorStop(0.72, "#fff0a0");
+      goldFill.addColorStop(1, "#c99700");
+    }
+    const rainbowColors = [
+      "#f52549", "#ff592b", "#ff9828", "#ffd52e", "#f4f13a",
+      "#4bd34d", "#20c9a5", "#2588f5", "#713be8",
+    ];
     for (let y = 0; y < sprite.length; y++) {
       for (let x = 0; x < sprite[y].length; x++) {
         const shade = sprite[y][x];
         if (shade === ".") continue;
-        context.fillStyle = shade === "k" ? "#07111a" : goober.color;
+        if (shade === "k") {
+          context.fillStyle = "#07111a";
+        } else if (goober.specialType === "golden") {
+          context.fillStyle = goldFill!;
+        } else if (goober.specialType === "rainbow") {
+          context.fillStyle = rainbowColors[x];
+        } else {
+          context.fillStyle = goober.color;
+        }
         context.fillRect(left + x * pixel, top + y * pixel, pixel, pixel);
       }
     }

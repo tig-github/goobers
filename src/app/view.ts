@@ -37,6 +37,10 @@ export function mountApp(root: HTMLElement): void {
         <button id="trigger-gathering" type="button">trigger gathering</button>
         <button id="trigger-drift" type="button">trigger drift</button>
         <button id="trigger-color-parade" type="button">trigger color parade</button>
+        <button id="trigger-conga-line" type="button">trigger conga line</button>
+        <button id="trigger-golden-goober" type="button">trigger golden goober</button>
+        <button id="trigger-rainbow-goober" type="button">trigger rainbow goober</button>
+        <button id="trigger-gassy" type="button">trigger gassy</button>
       </aside>
     </section>
     <section class="toolbar" aria-label="Field controls">

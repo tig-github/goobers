@@ -1,9 +1,9 @@
 ﻿import type { Personality } from "./personalities";
 
-export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy";
+export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow";
 export type OrderlyPattern = "triangle" | "circle" | "square";
 export const MIN_ORDERLY_RADIUS = 36;
-export const MAX_ORDERLY_RADIUS = 82;
+export const MAX_ORDERLY_RADIUS = 180;
 
 export function randomOrderlyRadius(): number {
   return MIN_ORDERLY_RADIUS + Math.random() * (MAX_ORDERLY_RADIUS - MIN_ORDERLY_RADIUS);
@@ -28,6 +28,8 @@ export const SPECIAL_TYPE_CHANCES: Readonly<Record<SpecialType, number>> = {
   speedy: 2.5,
   orderly: 2.5,
   glowy: 2.5,
+  golden: 0,
+  rainbow: 0,
 };
 
 export class SpecialTypeRegistry {
@@ -80,6 +82,10 @@ export class SpecialTypeRegistry {
         }
         break;
       case "glowy":
+        break;
+      case "golden":
+        break;
+      case "rainbow":
         break;
     }
   }
