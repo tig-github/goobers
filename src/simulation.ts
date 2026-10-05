@@ -41,6 +41,15 @@ export interface Goober {
   isArtistPainting?: boolean;
   artistBreakRemaining?: number;
   artistNextBreak?: number;
+  homeX?: number;
+  homeY?: number;
+  explorerX?: number;
+  explorerY?: number;
+  napRemaining?: number;
+  nextNap?: number;
+  dizzyPhase?: number;
+  playfulTargetId?: number;
+  orbitDirection?: number;
 }
 
 export interface ArtistPaint {
@@ -298,6 +307,23 @@ export function stepSimulation(
     } else {
       goober.isArtistPainting = false;
     }
+    if (goober.personality === "sleepy") {
+      goober.nextNap ??= 25 + Math.random() * 45;
+      if ((goober.napRemaining ?? 0) > 0) {
+        goober.napRemaining = Math.max(0, goober.napRemaining! - deltaSeconds);
+        goober.velocityX *= Math.max(0, 1 - deltaSeconds * 4);
+        goober.velocityY *= Math.max(0, 1 - deltaSeconds * 4);
+        continue;
+      }
+      goober.nextNap -= deltaSeconds;
+      if (goober.nextNap <= 0) {
+        goober.napRemaining = 3 + Math.random() * 7;
+        goober.nextNap = 25 + Math.random() * 45;
+        goober.velocityX = 0;
+        goober.velocityY = 0;
+        continue;
+      }
+    }
     if (goober.specialType === "chameleon") {
       let nearestColorSource: Goober | null = null;
       let nearestDistanceSquared = CHAMELEON_COLOR_RADIUS * CHAMELEON_COLOR_RADIUS;
@@ -337,13 +363,53 @@ export function stepSimulation(
     let steerX = Math.cos(goober.wanderAngle) * 0.42;
     let steerY = Math.sin(goober.wanderAngle) * 0.42;
 
-    const margin = 82;
-    if (goober.x < margin) steerX += (margin - goober.x) / margin;
-    if (goober.x > width - margin)
-      steerX -= (goober.x - (width - margin)) / margin;
-    if (goober.y < margin) steerY += (margin - goober.y) / margin;
-    if (goober.y > height - margin)
-      steerY -= (goober.y - (height - margin)) / margin;
+    if (goober.personality === "homebody") {
+      goober.homeX ??= goober.x;
+      goober.homeY ??= goober.y;
+      const dx = goober.homeX - goober.x;
+      const dy = goober.homeY - goober.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > 100) {
+        steerX += (dx / distance) * Math.min((distance - 80) * 0.025, 3);
+        steerY += (dy / distance) * Math.min((distance - 80) * 0.025, 3);
+      }
+    } else if (goober.personality === "explorer") {
+      if (goober.explorerX === undefined || Math.hypot(goober.explorerX - goober.x, goober.explorerY! - goober.y) < 65) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 220 + Math.random() * 300;
+        goober.explorerX = Math.max(60, Math.min(width - 60, goober.x + Math.cos(angle) * distance));
+        goober.explorerY = Math.max(60, Math.min(height - 60, goober.y + Math.sin(angle) * distance));
+      }
+      steerX += (goober.explorerX - goober.x) * 0.018;
+      steerY += (goober.explorerY! - goober.y) * 0.018;
+    } else if (goober.personality === "dizzy") {
+      goober.dizzyPhase = (goober.dizzyPhase ?? 0) + deltaSeconds * 5;
+      steerX += -Math.sin(goober.wanderAngle) * Math.sin(goober.dizzyPhase) * 1.25;
+      steerY += Math.cos(goober.wanderAngle) * Math.sin(goober.dizzyPhase) * 1.25;
+    } else if (goober.personality === "wallflower") {
+      const edgeMargin = 48;
+      const distances = [goober.y, width - goober.x, height - goober.y, goober.x];
+      const edgeIndex = distances.indexOf(Math.min(...distances));
+      const nearestDistance = distances[edgeIndex];
+      const tangent = [0, Math.PI / 2, Math.PI, -Math.PI / 2][edgeIndex];
+      steerX += Math.cos(tangent) * 1.2;
+      steerY += Math.sin(tangent) * 1.2;
+      const edgeForce = Math.min(Math.abs(nearestDistance - edgeMargin) * 0.025, 2.5);
+      const normalAngle = [Math.PI / 2, Math.PI, -Math.PI / 2, 0][edgeIndex];
+      const towardEdge = nearestDistance > edgeMargin ? -1 : 1;
+      steerX += Math.cos(normalAngle) * edgeForce * towardEdge;
+      steerY += Math.sin(normalAngle) * edgeForce * towardEdge;
+    }
+
+    if (goober.personality !== "wallflower") {
+      const margin = 82;
+      if (goober.x < margin) steerX += (margin - goober.x) / margin;
+      if (goober.x > width - margin)
+        steerX -= (goober.x - (width - margin)) / margin;
+      if (goober.y < margin) steerY += (margin - goober.y) / margin;
+      if (goober.y > height - margin)
+        steerY -= (goober.y - (height - margin)) / margin;
+    }
 
     for (const neighbor of goobers) {
       if (neighbor === goober) continue;
@@ -416,6 +482,66 @@ export function stepSimulation(
         const curiosity = 0.75 * goober.personalityStrength;
         steerX += ((target.x - goober.x) / distance) * curiosity;
         steerY += ((target.y - goober.y) / distance) * curiosity;
+      }
+    }
+
+    if (goober.personality === "jealous") {
+      for (const neighbor of goobers) {
+        if (neighbor === goober || neighbor.specialType === null) continue;
+        const dx = goober.x - neighbor.x;
+        const dy = goober.y - neighbor.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > 0 && distance < 240) {
+          const strength = (240 - distance) / 240;
+          steerX += (dx / distance) * strength * 2.2;
+          steerY += (dy / distance) * strength * 2.2;
+        }
+      }
+    } else if (goober.personality === "picky" || goober.personality === "contrarian") {
+      for (const neighbor of goobers) {
+        if (neighbor === goober) continue;
+        const dx = neighbor.x - goober.x;
+        const dy = neighbor.y - goober.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance <= 0 || distance > 240) continue;
+        const sameColor = neighbor.color === goober.color;
+        const likes = goober.personality === "picky" ? sameColor : !sameColor;
+        const strength = (240 - distance) / 240;
+        const force = strength * (likes ? 1.15 : -1.6);
+        steerX += (dx / distance) * force;
+        steerY += (dy / distance) * force;
+      }
+    } else if (goober.personality === "orbiter" || goober.personality === "playful") {
+      let target = goober.personality === "playful"
+        ? goobers.find((candidate) => candidate.id === goober.playfulTargetId)
+        : undefined;
+      let nearest: Goober | undefined;
+      let nearestDistance = Infinity;
+      for (const neighbor of goobers) {
+        if (neighbor === goober) continue;
+        const distance = Math.hypot(neighbor.x - goober.x, neighbor.y - goober.y);
+        if (distance < nearestDistance && (goober.personality !== "playful" || neighbor.id !== goober.playfulTargetId)) {
+          nearest = neighbor;
+          nearestDistance = distance;
+        }
+      }
+      if (!target || (goober.personality === "playful" && Math.hypot(target.x - goober.x, target.y - goober.y) < 58)) {
+        target = nearest;
+        if (goober.personality === "playful") goober.playfulTargetId = target?.id;
+      }
+      if (target) {
+        const dx = target.x - goober.x;
+        const dy = target.y - goober.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        if (goober.personality === "orbiter") {
+          const direction = goober.orbitDirection ?? (goober.orbitDirection = Math.random() < 0.5 ? -1 : 1);
+          const radial = (distance - 120) * 0.012;
+          steerX += (dx / distance) * radial - (dy / distance) * direction * 1.7;
+          steerY += (dy / distance) * radial + (dx / distance) * direction * 1.7;
+        } else {
+          steerX += (dx / distance) * 1.8;
+          steerY += (dy / distance) * 1.8;
+        }
       }
     }
 

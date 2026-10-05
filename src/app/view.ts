@@ -12,6 +12,7 @@ import {
   MIN_GOOBER_SPEED,
   ZOOM_STEP,
 } from "../consts";
+import { PERSONALITIES } from "../personalities";
 
 export function mountApp(root: HTMLElement): void {
   root.innerHTML = `
@@ -57,7 +58,7 @@ export function mountApp(root: HTMLElement): void {
             <input id="admin-goober-color" type="color" value="#438cff">
             <label for="admin-goober-personality">personality</label>
             <select id="admin-goober-personality">
-              <option value="shy">shy</option><option value="social">social</option><option value="chaotic">chaotic</option><option value="curious">curious</option><option value="orderly">orderly</option>
+              ${PERSONALITIES.map(({ id, name }) => `<option value="${id}">${name.toLowerCase()}</option>`).join("")}
             </select>
             <label for="admin-goober-size">size <output id="admin-goober-size-value">1.00×</output></label>
             <input id="admin-goober-size" type="range" min="0.5" max="1.8" step="0.05" value="1">
