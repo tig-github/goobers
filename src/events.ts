@@ -44,7 +44,7 @@ const COLOR_PARADE_DURATION_SECONDS = 60;
 const CONGA_LINE_DURATION_SECONDS = 90;
 const GOLDEN_GOOBER_DURATION_SECONDS = 45;
 const GOLDEN_GOOBER_DURATION_VARIATION_SECONDS = 3;
-const EVENT_COOLDOWN_SECONDS = 15 * 60;
+const EVENT_COOLDOWN_SECONDS = 3 * 60;
 const EVENT_CHECK_INTERVAL_SECONDS = 1;
 const EVENT_CHANCE_PER_CHECK = 1 / 240;
 const FIELD_EDGE_PADDING = 100;
@@ -87,7 +87,9 @@ export class EventSystem {
       };
     }
     this.checkElapsed = 0;
-    return this.activeEvent;
+    const event = this.activeEvent;
+    if (!event) throw new Error("Failed to create the requested field event.");
+    return event;
   }
 
   update(deltaSeconds: number, width: number, height: number): { event: FieldEvent | null; ended: FieldEvent | null } {

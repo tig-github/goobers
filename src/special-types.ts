@@ -1,6 +1,6 @@
 ﻿import type { Personality } from "./personalities";
 
-export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow";
+export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow" | "chameleon";
 export type OrderlyPattern = "triangle" | "circle" | "square";
 export const MIN_ORDERLY_RADIUS = 36;
 export const MAX_ORDERLY_RADIUS = 180;
@@ -30,6 +30,7 @@ export const SPECIAL_TYPE_CHANCES: Readonly<Record<SpecialType, number>> = {
   glowy: 2.5,
   golden: 0,
   rainbow: 0,
+  chameleon: 2.5,
 };
 
 export class SpecialTypeRegistry {
@@ -53,6 +54,10 @@ export class SpecialTypeRegistry {
       this.apply(type, goober);
       return;
     }
+  }
+
+  assignSpecific(type: SpecialType, goober: SpecialGoober): void {
+    this.apply(type, goober);
   }
 
   private apply(type: SpecialType, goober: SpecialGoober): void {
@@ -87,10 +92,16 @@ export class SpecialTypeRegistry {
         break;
       case "rainbow":
         break;
+      case "chameleon":
+        break;
     }
   }
 }
 
 export const specialTypeRegistry = new SpecialTypeRegistry();
+
+export function applySpecialType(goober: SpecialGoober, type: SpecialType): void {
+  specialTypeRegistry.assignSpecific(type, goober);
+}
 
 

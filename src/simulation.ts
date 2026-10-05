@@ -109,7 +109,26 @@ export function maybeAssignSpecialType(goober: Goober): void {
   specialTypeRegistry.assign(goober);
 }
 
+function parseHexColor(color: string): [number, number, number] | null {
+  const value = color.startsWith("#") ? color.slice(1) : color;
+  const normalized = value.length === 3
+    ? [...value].map((digit) => digit + digit).join("")
+    : value;
+  if (!/^[\da-f]{6}$/i.test(normalized)) return null;
+  return [0, 2, 4].map((index) => Number.parseInt(normalized.slice(index, index + 2), 16)) as [number, number, number];
+}
+
+function blendHexColors(from: string, to: string, amount: number): string {
+  const source = parseHexColor(from);
+  const target = parseHexColor(to);
+  if (!source || !target) return to;
+  const channels = source.map((value, index) => Math.round(value + (target[index] - value) * amount));
+  return `#${channels.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
 const GOLDEN_GOOBER_NAMES = ["shmoober", "doober", "bloober", "scoober", "goldagoober", "gloober", "mr thames"];
+const CHAMELEON_COLOR_RADIUS = 130;
+const CHAMELEON_COLOR_BLEND_RATE = 7.5;
 
 export function createGoldenEventGoober(width: number, height: number): Goober {
   const goober = createGoobers(1, "#ffcc00", width, height)[0];
@@ -214,6 +233,24 @@ export function stepSimulation(
       const clearMargin = 32 * goober.size + 12 + trailClearance;
       goober.hasLeftField = goober.x < -clearMargin || goober.x > width + clearMargin || goober.y < -clearMargin || goober.y > height + clearMargin;
       continue;
+    }
+    if (goober.specialType === "chameleon") {
+      let nearestColorSource: Goober | null = null;
+      let nearestDistanceSquared = CHAMELEON_COLOR_RADIUS * CHAMELEON_COLOR_RADIUS;
+      for (const neighbor of goobers) {
+        if (neighbor === goober || neighbor.specialType === "golden" || neighbor.specialType === "rainbow") continue;
+        const dx = neighbor.x - goober.x;
+        const dy = neighbor.y - goober.y;
+        const distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < nearestDistanceSquared) {
+          nearestColorSource = neighbor;
+          nearestDistanceSquared = distanceSquared;
+        }
+      }
+      if (nearestColorSource) {
+        const blend = 1 - Math.exp(-deltaSeconds * CHAMELEON_COLOR_BLEND_RATE);
+        goober.color = blendHexColors(goober.color, nearestColorSource.color, blend);
+      }
     }
     if (fieldEvent?.type === "rainbow-goober" && goober.specialType === "orderly" && (goober.rainbowSpinTurns ?? 0) < 5) {
       goober.heading += deltaSeconds * Math.PI * 4;

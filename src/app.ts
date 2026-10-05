@@ -18,7 +18,7 @@ import { createStartingGoobers, presetGooberColors } from "./app/state";
 import { BadgeSystem } from "./app/badges";
 import { PERSONALITIES } from "./personalities";
 import { EventSystem, type FieldEvent } from "./events";
-import type { SpecialType } from "./special-types";
+import { applySpecialType, type SpecialType } from "./special-types";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 mountApp(app);
@@ -46,6 +46,20 @@ const eventIndicator =
   document.querySelector<HTMLDivElement>("#event-indicator")!;
 const adminToggle = document.querySelector<HTMLButtonElement>("#admin-toggle")!;
 const adminPanel = document.querySelector<HTMLElement>("#admin-panel")!;
+const adminEventsTab = document.querySelector<HTMLButtonElement>("#admin-events-tab")!;
+const adminSpawnTab = document.querySelector<HTMLButtonElement>("#admin-spawn-tab")!;
+const adminEventsPanel = document.querySelector<HTMLElement>("#admin-events-panel")!;
+const adminSpawnPanel = document.querySelector<HTMLElement>("#admin-spawn-panel")!;
+const adminSpawnForm = document.querySelector<HTMLFormElement>("#admin-spawn-form")!;
+const adminSpawnName = document.querySelector<HTMLInputElement>("#admin-goober-name")!;
+const adminSpawnColor = document.querySelector<HTMLInputElement>("#admin-goober-color")!;
+const adminSpawnPersonality = document.querySelector<HTMLSelectElement>("#admin-goober-personality")!;
+const adminSpawnSize = document.querySelector<HTMLInputElement>("#admin-goober-size")!;
+const adminSpawnSizeValue = document.querySelector<HTMLOutputElement>("#admin-goober-size-value")!;
+const adminSpawnSpeed = document.querySelector<HTMLInputElement>("#admin-goober-speed")!;
+const adminSpawnSpeedValue = document.querySelector<HTMLOutputElement>("#admin-goober-speed-value")!;
+const adminSpawnSpecial = document.querySelector<HTMLSelectElement>("#admin-goober-special")!;
+const adminSpawnStatus = document.querySelector<HTMLElement>("#admin-spawn-status")!;
 const themeButton =
   document.querySelector<HTMLButtonElement>("#theme-control")!;
 const fieldSizeInput = document.querySelector<HTMLInputElement>("#field-size")!;
@@ -66,6 +80,7 @@ const SPECIAL_TYPES: readonly SpecialType[] = [
   "glowy",
   "golden",
   "rainbow",
+  "chameleon",
 ];
 const notebookData = {
   personalities: new Set<string>(),
@@ -98,6 +113,10 @@ function updateIconSidebarPosition(): void {
 }
 let selectedNotebookEntry: NotebookEntry | null = null;
 let notebookListPage = 0;
+const notebookCatalogPages: Record<string, number> = {
+  personalities: 0,
+  "special types": 0,
+};
 let notebookUnlocked = false;
 let selectedGooberId: number | null = null;
 let followedGooberId: number | null = null;
@@ -139,6 +158,7 @@ function inspectGoobers(): void {
 
 function addGooberToNotebook(goober: Goober, name: string): void {
   notebookData.entries.push({ name, goober, favorite: false });
+  if (notebookData.entries.length >= 10) badgeSystem.earn("goobcyclopedia");
   notebookData.personalities.add(goober.personality);
   if (goober.specialType) notebookData.specialTypes.add(goober.specialType);
   if (goober.specialType === "golden") badgeSystem.earn("gilded-notebook");
@@ -213,13 +233,19 @@ function updateNotebook(): void {
     found: Set<string>,
   ) => {
     if (heading === "special types" && found.size === 0) return;
+    const foundValues = values.filter((value) => found.has(value));
+    const catalogPageCount = Math.ceil(foundValues.length / 4);
+    notebookCatalogPages[heading] = Math.min(
+      notebookCatalogPages[heading] ?? 0,
+      Math.max(0, catalogPageCount - 1),
+    );
     const section = document.createElement("section");
     const h = document.createElement("h3");
     h.textContent = heading;
     section.append(h);
     const list = document.createElement("ul");
-    for (const value of values) {
-      if (!found.has(value)) continue;
+    const first = notebookCatalogPages[heading] * 4;
+    for (const value of foundValues.slice(first, first + 4)) {
       const item = document.createElement("li");
       item.innerHTML = "<span>●</span>";
       const label = document.createElement("span");
@@ -234,6 +260,33 @@ function updateNotebook(): void {
       list.append(empty);
     }
     section.append(list);
+    if (catalogPageCount > 1) {
+      const pagination = document.createElement("nav");
+      pagination.className = "notebook-catalog-pagination";
+      pagination.setAttribute("aria-label", `${heading} pages`);
+      const previous = document.createElement("button");
+      previous.type = "button";
+      previous.textContent = "‹";
+      previous.setAttribute("aria-label", `Previous ${heading}`);
+      previous.disabled = notebookCatalogPages[heading] === 0;
+      previous.addEventListener("click", () => {
+        notebookCatalogPages[heading]--;
+        updateNotebook();
+      });
+      const status = document.createElement("span");
+      status.textContent = `${notebookCatalogPages[heading] + 1} / ${catalogPageCount}`;
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = "›";
+      next.setAttribute("aria-label", `Next ${heading}`);
+      next.disabled = notebookCatalogPages[heading] >= catalogPageCount - 1;
+      next.addEventListener("click", () => {
+        notebookCatalogPages[heading]++;
+        updateNotebook();
+      });
+      pagination.append(previous, status, next);
+      section.append(pagination);
+    }
     catalog.append(section);
   };
   addCatalog("personalities", PERSONALITY_IDS, notebookData.personalities);
@@ -772,6 +825,65 @@ themeButton.addEventListener("click", () =>
 adminToggle.addEventListener("click", () => {
   adminPanel.hidden = !adminPanel.hidden;
   adminToggle.setAttribute("aria-expanded", String(!adminPanel.hidden));
+});
+function selectAdminTab(tab: "events" | "spawn"): void {
+  const showSpawn = tab === "spawn";
+  adminEventsTab.classList.toggle("is-active", !showSpawn);
+  adminSpawnTab.classList.toggle("is-active", showSpawn);
+  adminEventsTab.setAttribute("aria-selected", String(!showSpawn));
+  adminSpawnTab.setAttribute("aria-selected", String(showSpawn));
+  adminEventsPanel.hidden = showSpawn;
+  adminSpawnPanel.hidden = !showSpawn;
+}
+adminEventsTab.addEventListener("click", () => selectAdminTab("events"));
+adminSpawnTab.addEventListener("click", () => selectAdminTab("spawn"));
+adminSpawnPersonality.addEventListener("change", () => {
+  if (adminSpawnPersonality.value === "orderly") {
+    adminSpawnSpecial.value = "orderly";
+  } else if (adminSpawnSpecial.value === "orderly") {
+    adminSpawnSpecial.value = "none";
+  }
+});
+adminSpawnSpecial.addEventListener("change", () => {
+  if (adminSpawnSpecial.value === "orderly") {
+    adminSpawnPersonality.value = "orderly";
+  } else if (adminSpawnPersonality.value === "orderly") {
+    adminSpawnPersonality.value = "shy";
+  }
+});
+adminSpawnSize.addEventListener("input", () => {
+  adminSpawnSizeValue.value = `${Number(adminSpawnSize.value).toFixed(2)}×`;
+});
+adminSpawnSpeed.addEventListener("input", () => {
+  adminSpawnSpeedValue.value = `${Number(adminSpawnSpeed.value).toFixed(1)}×`;
+});
+adminSpawnForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (goobers.length >= MAX_GOOBERS) {
+    adminSpawnStatus.textContent = "field is full";
+    return;
+  }
+  const added = createGoobers(
+    1,
+    adminSpawnColor.value,
+    renderer.worldWidth,
+    renderer.worldHeight,
+  );
+  const goober = added[0];
+  goober.size = Number(adminSpawnSize.value);
+  goober.speedFactor = Number(adminSpawnSpeed.value);
+  goober.personality = adminSpawnPersonality.value as Goober["personality"];
+  const name = adminSpawnName.value.trim();
+  if (name) goober.name = name;
+  if (adminSpawnSpecial.value !== "none") {
+    applySpecialType(goober, adminSpawnSpecial.value as SpecialType);
+  }
+  goobers.push(goober);
+  inspectGoobers();
+  updatePopulationDisplay();
+  updateSavedLoadouts();
+  updateGooberDetails();
+  adminSpawnStatus.textContent = `${goober.name} spawned`;
 });
 for (const eventType of [
   "gathering",

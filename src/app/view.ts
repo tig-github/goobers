@@ -33,14 +33,44 @@ export function mountApp(root: HTMLElement): void {
       <aside id="goober-details" class="goober-details" aria-live="polite" hidden></aside>
       <aside id="admin-panel" class="admin-panel" aria-label="Admin panel" hidden>
         <h2>admin panel</h2>
-        <p>Developer controls for testing field events.</p>
-        <button id="trigger-gathering" type="button">trigger gathering</button>
-        <button id="trigger-drift" type="button">trigger drift</button>
-        <button id="trigger-color-parade" type="button">trigger color parade</button>
-        <button id="trigger-conga-line" type="button">trigger conga line</button>
-        <button id="trigger-golden-goober" type="button">trigger golden goober</button>
-        <button id="trigger-rainbow-goober" type="button">trigger rainbow goober</button>
-        <button id="trigger-gassy" type="button">trigger gassy</button>
+        <div class="admin-tabs" role="tablist" aria-label="Admin tools">
+          <button id="admin-events-tab" class="admin-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="admin-events-panel">events</button>
+          <button id="admin-spawn-tab" class="admin-tab" type="button" role="tab" aria-selected="false" aria-controls="admin-spawn-panel">spawn goober</button>
+        </div>
+        <section id="admin-events-panel" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-events-tab">
+          <p>Developer controls for testing field events.</p>
+          <div class="admin-event-actions">
+            <button id="trigger-gathering" type="button">trigger gathering</button>
+            <button id="trigger-drift" type="button">trigger drift</button>
+            <button id="trigger-color-parade" type="button">trigger color parade</button>
+            <button id="trigger-conga-line" type="button">trigger conga line</button>
+            <button id="trigger-golden-goober" type="button">trigger golden goober</button>
+            <button id="trigger-rainbow-goober" type="button">trigger rainbow goober</button>
+            <button id="trigger-gassy" type="button">trigger gassy</button>
+          </div>
+        </section>
+        <section id="admin-spawn-panel" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-spawn-tab" hidden>
+          <form id="admin-spawn-form" class="admin-spawn-form">
+            <label for="admin-goober-name">name <span>(optional)</span></label>
+            <input id="admin-goober-name" type="text" maxlength="24" placeholder="Goober name">
+            <label for="admin-goober-color">color</label>
+            <input id="admin-goober-color" type="color" value="#438cff">
+            <label for="admin-goober-personality">personality</label>
+            <select id="admin-goober-personality">
+              <option value="shy">shy</option><option value="social">social</option><option value="chaotic">chaotic</option><option value="curious">curious</option><option value="orderly">orderly</option>
+            </select>
+            <label for="admin-goober-size">size <output id="admin-goober-size-value">1.00×</output></label>
+            <input id="admin-goober-size" type="range" min="0.5" max="1.8" step="0.05" value="1">
+            <label for="admin-goober-speed">speed <output id="admin-goober-speed-value">1.0×</output></label>
+            <input id="admin-goober-speed" type="range" min="0.4" max="1.8" step="0.1" value="1">
+            <label for="admin-goober-special">special type</label>
+            <select id="admin-goober-special">
+              <option value="none">none</option><option value="tiny">tiny</option><option value="speedy">speedy</option><option value="orderly">orderly</option><option value="glowy">glowy</option><option value="golden">golden</option><option value="rainbow">rainbow</option><option value="chameleon">chameleon</option>
+            </select>
+            <button class="admin-spawn-submit" type="submit">spawn goober</button>
+            <span id="admin-spawn-status" role="status" aria-live="polite"></span>
+          </form>
+        </section>
       </aside>
     </section>
     <section class="toolbar" aria-label="Field controls">

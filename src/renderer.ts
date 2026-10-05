@@ -14,9 +14,18 @@ export class ArenaRenderer {
   private theme: "dark" | "light" = "light";
   private readonly renderedHeadings = new Map<number, number>();
   private readonly portraitHeadings = new Map<number, number>();
-  private readonly rainbowTrails = new Map<number, { x: number; y: number; time: number; color: string; size: number }[]>();
-  private readonly gassyTrails = new Map<number, { x: number; y: number; time: number; color: string; size: number }[]>();
-  private readonly goldenSparkleTrails = new Map<number, { x: number; y: number; time: number; size: number; rotation: number }[]>();
+  private readonly rainbowTrails = new Map<
+    number,
+    { x: number; y: number; time: number; color: string; size: number }[]
+  >();
+  private readonly gassyTrails = new Map<
+    number,
+    { x: number; y: number; time: number; color: string; size: number }[]
+  >();
+  private readonly goldenSparkleTrails = new Map<
+    number,
+    { x: number; y: number; time: number; size: number; rotation: number }[]
+  >();
   private previousRenderTime = 0;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -28,14 +37,24 @@ export class ArenaRenderer {
     this.resize();
   }
 
-  draw(goobers: Goober[], elapsed: number, selectedId: number | null = null, fieldEvent?: FieldEvent): void {
+  draw(
+    goobers: Goober[],
+    elapsed: number,
+    selectedId: number | null = null,
+    fieldEvent?: FieldEvent,
+  ): void {
     const now = performance.now();
-    const delta = this.previousRenderTime === 0 ? 0 : Math.min((now - this.previousRenderTime) / 1000, 0.05);
+    const delta =
+      this.previousRenderTime === 0
+        ? 0
+        : Math.min((now - this.previousRenderTime) / 1000, 0.05);
     this.previousRenderTime = now;
     const headingSmoothing = 1 - Math.exp(-delta * 7);
     const portraitSmoothing = 1 - Math.exp(-delta * 1.8);
     if (this.followedGooberId !== null) {
-      const followed = goobers.find((goober) => goober.id === this.followedGooberId);
+      const followed = goobers.find(
+        (goober) => goober.id === this.followedGooberId,
+      );
       if (followed) {
         const followSmoothing = 1 - Math.exp(-delta * 8);
         this.centerX += (followed.x - this.centerX) * followSmoothing;
@@ -47,17 +66,31 @@ export class ArenaRenderer {
     }
     for (const goober of goobers) {
       const previous = this.renderedHeadings.get(goober.id);
-      if (goober.isRainbowSpinning || previous === undefined) this.renderedHeadings.set(goober.id, goober.heading);
+      if (goober.isRainbowSpinning || previous === undefined)
+        this.renderedHeadings.set(goober.id, goober.heading);
       else {
-        const difference = Math.atan2(Math.sin(goober.heading - previous), Math.cos(goober.heading - previous));
-        this.renderedHeadings.set(goober.id, previous + difference * headingSmoothing);
+        const difference = Math.atan2(
+          Math.sin(goober.heading - previous),
+          Math.cos(goober.heading - previous),
+        );
+        this.renderedHeadings.set(
+          goober.id,
+          previous + difference * headingSmoothing,
+        );
       }
       const rendered = this.renderedHeadings.get(goober.id) ?? goober.heading;
       const portraitPrevious = this.portraitHeadings.get(goober.id);
-      if (portraitPrevious === undefined) this.portraitHeadings.set(goober.id, rendered);
+      if (portraitPrevious === undefined)
+        this.portraitHeadings.set(goober.id, rendered);
       else {
-        const difference = Math.atan2(Math.sin(rendered - portraitPrevious), Math.cos(rendered - portraitPrevious));
-        this.portraitHeadings.set(goober.id, portraitPrevious + difference * portraitSmoothing);
+        const difference = Math.atan2(
+          Math.sin(rendered - portraitPrevious),
+          Math.cos(rendered - portraitPrevious),
+        );
+        this.portraitHeadings.set(
+          goober.id,
+          portraitPrevious + difference * portraitSmoothing,
+        );
       }
     }
     const { context, canvas } = this;
@@ -67,14 +100,7 @@ export class ArenaRenderer {
     const top = this.centerY - viewHeight / 2;
     const scaleX = canvas.width / viewWidth;
     const scaleY = canvas.height / viewHeight;
-    context.setTransform(
-      scaleX,
-      0,
-      0,
-      scaleY,
-      -left * scaleX,
-      -top * scaleY,
-    );
+    context.setTransform(scaleX, 0, 0, scaleY, -left * scaleX, -top * scaleY);
     context.clearRect(left, top, viewWidth, viewHeight);
     this.drawField();
     if (fieldEvent) this.drawFieldEvent(fieldEvent, elapsed, goobers);
@@ -82,35 +108,73 @@ export class ArenaRenderer {
     this.drawGassyTrails(fieldEvent, elapsed, goobers);
     this.drawGoldenSparkleTrails(fieldEvent, elapsed, goobers);
     for (const goober of goobers) {
-      this.drawGoober(goober, elapsed, this.context, this.renderedHeadings.get(goober.id) ?? goober.heading, goober.id === selectedId);
+      this.drawGoober(
+        goober,
+        elapsed,
+        this.context,
+        this.renderedHeadings.get(goober.id) ?? goober.heading,
+        goober.id === selectedId,
+      );
     }
   }
 
-  pickGoober(clientX: number, clientY: number, goobers: Goober[]): Goober | undefined {
+  pickGoober(
+    clientX: number,
+    clientY: number,
+    goobers: Goober[],
+  ): Goober | undefined {
     const bounds = this.canvas.getBoundingClientRect();
     const viewWidth = this.worldWidth / this.zoom;
     const viewHeight = this.worldHeight / this.zoom;
-    const worldX = this.centerX - viewWidth / 2 + (clientX - bounds.left) / bounds.width * viewWidth;
-    const worldY = this.centerY - viewHeight / 2 + (clientY - bounds.top) / bounds.height * viewHeight;
-    return [...goobers].reverse().find((goober) => Math.hypot(worldX - goober.x, worldY - goober.y) <= 34 * goober.size);
+    const worldX =
+      this.centerX -
+      viewWidth / 2 +
+      ((clientX - bounds.left) / bounds.width) * viewWidth;
+    const worldY =
+      this.centerY -
+      viewHeight / 2 +
+      ((clientY - bounds.top) / bounds.height) * viewHeight;
+    return [...goobers]
+      .reverse()
+      .find(
+        (goober) =>
+          Math.hypot(worldX - goober.x, worldY - goober.y) <= 34 * goober.size,
+      );
   }
 
-  drawPortrait(canvas: HTMLCanvasElement, goober: Goober, elapsed: number): void {
+  drawPortrait(
+    canvas: HTMLCanvasElement,
+    goober: Goober,
+    elapsed: number,
+  ): void {
     const context = canvas.getContext("2d");
     if (!context) return;
     const bounds = canvas.getBoundingClientRect();
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(bounds.width * ratio) || canvas.height !== Math.round(bounds.height * ratio)) {
+    if (
+      canvas.width !== Math.round(bounds.width * ratio) ||
+      canvas.height !== Math.round(bounds.height * ratio)
+    ) {
       canvas.width = Math.round(bounds.width * ratio);
       canvas.height = Math.round(bounds.height * ratio);
     }
     const scale = 2.6;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, bounds.width, bounds.height);
-    context.setTransform(ratio * scale, 0, 0, ratio * scale,
+    context.setTransform(
+      ratio * scale,
+      0,
+      0,
+      ratio * scale,
       ratio * (bounds.width / 2 - goober.x * scale),
-      ratio * (bounds.height / 2 - goober.y * scale));
-    this.drawGoober(goober, elapsed, context, this.portraitHeadings.get(goober.id) ?? goober.heading);
+      ratio * (bounds.height / 2 - goober.y * scale),
+    );
+    this.drawGoober(
+      goober,
+      elapsed,
+      context,
+      this.portraitHeadings.get(goober.id) ?? goober.heading,
+    );
   }
 
   setTheme(theme: "dark" | "light"): void {
@@ -133,11 +197,13 @@ export class ArenaRenderer {
     const bounds = this.canvas.getBoundingClientRect();
     const horizontalOffset = (clientX - bounds.left) / bounds.width - 0.5;
     const verticalOffset = (clientY - bounds.top) / bounds.height - 0.5;
-    const worldX = this.centerX + horizontalOffset * this.worldWidth / this.zoom;
-    const worldY = this.centerY + verticalOffset * this.worldHeight / this.zoom;
+    const worldX =
+      this.centerX + (horizontalOffset * this.worldWidth) / this.zoom;
+    const worldY =
+      this.centerY + (verticalOffset * this.worldHeight) / this.zoom;
     this.zoom = zoom;
-    this.centerX = worldX - horizontalOffset * this.worldWidth / this.zoom;
-    this.centerY = worldY - verticalOffset * this.worldHeight / this.zoom;
+    this.centerX = worldX - (horizontalOffset * this.worldWidth) / this.zoom;
+    this.centerY = worldY - (verticalOffset * this.worldHeight) / this.zoom;
     this.clampView();
   }
 
@@ -148,16 +214,22 @@ export class ArenaRenderer {
   panByPixels(deltaX: number, deltaY: number): void {
     if (this.zoom <= 1) return;
     const bounds = this.canvas.getBoundingClientRect();
-    this.centerX -= deltaX / bounds.width * this.worldWidth / this.zoom;
-    this.centerY -= deltaY / bounds.height * this.worldHeight / this.zoom;
+    this.centerX -= ((deltaX / bounds.width) * this.worldWidth) / this.zoom;
+    this.centerY -= ((deltaY / bounds.height) * this.worldHeight) / this.zoom;
     this.clampView();
   }
 
   private clampView(): void {
     const halfWidth = this.worldWidth / this.zoom / 2;
     const halfHeight = this.worldHeight / this.zoom / 2;
-    this.centerX = Math.max(halfWidth, Math.min(this.worldWidth - halfWidth, this.centerX));
-    this.centerY = Math.max(halfHeight, Math.min(this.worldHeight - halfHeight, this.centerY));
+    this.centerX = Math.max(
+      halfWidth,
+      Math.min(this.worldWidth - halfWidth, this.centerX),
+    );
+    this.centerY = Math.max(
+      halfHeight,
+      Math.min(this.worldHeight - halfHeight, this.centerY),
+    );
   }
 
   private resize(): void {
@@ -167,12 +239,19 @@ export class ArenaRenderer {
     this.canvas.height = Math.round(bounds.height * pixelRatio);
   }
 
-  private drawFieldEvent(event: FieldEvent, elapsed: number, goobers: Goober[]): void {
+  private drawFieldEvent(
+    event: FieldEvent,
+    elapsed: number,
+    goobers: Goober[],
+  ): void {
     if (event.type === "drift") {
       const context = this.context;
       const angle = Math.atan2(event.directionY, event.directionX);
       context.save();
-      context.strokeStyle = this.theme === "light" ? "rgba(59, 129, 166, 0.48)" : "rgba(122, 205, 231, 0.55)";
+      context.strokeStyle =
+        this.theme === "light"
+          ? "rgba(59, 129, 166, 0.48)"
+          : "rgba(122, 205, 231, 0.55)";
       context.fillStyle = context.strokeStyle;
       context.lineWidth = 3;
       for (let column = 1; column <= 5; column++) {
@@ -196,11 +275,16 @@ export class ArenaRenderer {
     } else if (event.type === "gathering") {
       this.drawGatheringMarker(event, elapsed);
     } else if (event.type === "conga-line") {
-      const line = goobers.filter((goober) => goober.specialType !== "orderly").sort((a, b) => a.id - b.id);
+      const line = goobers
+        .filter((goober) => goober.specialType !== "orderly")
+        .sort((a, b) => a.id - b.id);
       if (line.length < 2) return;
       const context = this.context;
       context.save();
-      context.strokeStyle = this.theme === "light" ? "rgba(48, 91, 145, 0.48)" : "rgba(141, 186, 255, 0.55)";
+      context.strokeStyle =
+        this.theme === "light"
+          ? "rgba(48, 91, 145, 0.48)"
+          : "rgba(141, 186, 255, 0.55)";
       context.lineWidth = 2;
       context.setLineDash([8, 8]);
       context.lineDashOffset = -elapsed * 12;
@@ -212,14 +296,23 @@ export class ArenaRenderer {
     }
   }
 
-  private drawGatheringMarker(target: { x: number; y: number }, elapsed: number): void {
+  private drawGatheringMarker(
+    target: { x: number; y: number },
+    elapsed: number,
+  ): void {
     const context = this.context;
     const pulse = 1 + Math.sin(elapsed * 5) * 0.12;
     context.save();
     context.translate(target.x, target.y);
     context.scale(pulse, pulse);
-    context.strokeStyle = this.theme === "light" ? "rgba(214, 151, 45, 0.75)" : "rgba(255, 204, 103, 0.85)";
-    context.fillStyle = this.theme === "light" ? "rgba(244, 187, 79, 0.18)" : "rgba(255, 204, 103, 0.16)";
+    context.strokeStyle =
+      this.theme === "light"
+        ? "rgba(214, 151, 45, 0.75)"
+        : "rgba(255, 204, 103, 0.85)";
+    context.fillStyle =
+      this.theme === "light"
+        ? "rgba(244, 187, 79, 0.18)"
+        : "rgba(255, 204, 103, 0.16)";
     context.lineWidth = 2;
     context.beginPath();
     context.arc(0, 0, 32, 0, Math.PI * 2);
@@ -229,20 +322,38 @@ export class ArenaRenderer {
     context.arc(0, 0, 46, 0, Math.PI * 2);
     context.stroke();
     context.beginPath();
-    context.moveTo(-8, 0); context.lineTo(8, 0);
-    context.moveTo(0, -8); context.lineTo(0, 8);
+    context.moveTo(-8, 0);
+    context.lineTo(8, 0);
+    context.moveTo(0, -8);
+    context.lineTo(0, 8);
     context.stroke();
     context.restore();
   }
 
-  private drawRainbowTrail(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
-    const rainbows = goobers.filter((goober) => goober.specialType === "rainbow");
+  private drawRainbowTrail(
+    fieldEvent: FieldEvent | undefined,
+    elapsed: number,
+    goobers: Goober[],
+  ): void {
+    const rainbows = goobers.filter(
+      (goober) => goober.specialType === "rainbow",
+    );
     const activeIds = new Set(rainbows.map((goober) => goober.id));
     for (const id of this.rainbowTrails.keys()) {
       if (!activeIds.has(id)) this.rainbowTrails.delete(id);
     }
     if (rainbows.length === 0) return;
-    const colors = ["#ff304f", "#ff7628", "#ffc928", "#f7f044", "#45dd74", "#31c9d9", "#438aff", "#824dff", "#dd4aff"];
+    const colors = [
+      "#ff304f",
+      "#ff7628",
+      "#ffc928",
+      "#f7f044",
+      "#45dd74",
+      "#31c9d9",
+      "#438aff",
+      "#824dff",
+      "#dd4aff",
+    ];
     const trailDuration = fieldEvent?.type === "gassy" ? 2.8 : 1.4;
     const context = this.context;
     context.save();
@@ -253,7 +364,9 @@ export class ArenaRenderer {
       if (!last || elapsed - last.time >= 0.11) {
         const particleCount = leaving
           ? 10 + Math.floor(Math.random() * 10)
-          : Math.random() < 0.25 ? 2 : 1;
+          : Math.random() < 0.25
+            ? 2
+            : 1;
         for (let index = 0; index < particleCount; index++) {
           const angle = Math.random() * Math.PI * 2;
           const distance = Math.random() * 7;
@@ -266,7 +379,8 @@ export class ArenaRenderer {
           });
         }
       }
-      while (trail.length > 0 && elapsed - trail[0].time > trailDuration) trail.shift();
+      while (trail.length > 0 && elapsed - trail[0].time > trailDuration)
+        trail.shift();
       this.rainbowTrails.set(rainbow.id, trail);
       for (const particle of trail) {
         const age = elapsed - particle.time;
@@ -275,7 +389,13 @@ export class ArenaRenderer {
         context.shadowColor = particle.color;
         context.shadowBlur = 9;
         context.beginPath();
-        context.arc(particle.x, particle.y, particle.size * (1 - age * 0.25), 0, Math.PI * 2);
+        context.arc(
+          particle.x,
+          particle.y,
+          particle.size * (1 - age * 0.25),
+          0,
+          Math.PI * 2,
+        );
         context.fill();
       }
     }
@@ -283,7 +403,11 @@ export class ArenaRenderer {
     context.restore();
   }
 
-  private drawGassyTrails(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
+  private drawGassyTrails(
+    fieldEvent: FieldEvent | undefined,
+    elapsed: number,
+    goobers: Goober[],
+  ): void {
     if (fieldEvent?.type !== "gassy") {
       this.gassyTrails.clear();
       return;
@@ -321,7 +445,13 @@ export class ArenaRenderer {
         context.shadowColor = particle.color;
         context.shadowBlur = 9;
         context.beginPath();
-        context.arc(particle.x, particle.y, particle.size * (1 - age * 0.25), 0, Math.PI * 2);
+        context.arc(
+          particle.x,
+          particle.y,
+          particle.size * (1 - age * 0.25),
+          0,
+          Math.PI * 2,
+        );
         context.fill();
       }
     }
@@ -329,12 +459,18 @@ export class ArenaRenderer {
     context.restore();
   }
 
-  private drawGoldenSparkleTrails(fieldEvent: FieldEvent | undefined, elapsed: number, goobers: Goober[]): void {
+  private drawGoldenSparkleTrails(
+    fieldEvent: FieldEvent | undefined,
+    elapsed: number,
+    goobers: Goober[],
+  ): void {
     if (fieldEvent?.type !== "gassy") {
       this.goldenSparkleTrails.clear();
       return;
     }
-    const goldenGoobers = goobers.filter((goober) => goober.specialType === "golden");
+    const goldenGoobers = goobers.filter(
+      (goober) => goober.specialType === "golden",
+    );
     const activeIds = new Set(goldenGoobers.map((goober) => goober.id));
     for (const id of this.goldenSparkleTrails.keys()) {
       if (!activeIds.has(id)) this.goldenSparkleTrails.delete(id);
@@ -348,9 +484,10 @@ export class ArenaRenderer {
       const trail = this.goldenSparkleTrails.get(golden.id) ?? [];
       const last = trail[trail.length - 1];
       if (!last || elapsed - last.time >= 0.085) {
-        const heading = Math.hypot(golden.velocityX, golden.velocityY) > 0.1
-          ? Math.atan2(golden.velocityY, golden.velocityX)
-          : golden.heading;
+        const heading =
+          Math.hypot(golden.velocityX, golden.velocityY) > 0.1
+            ? Math.atan2(golden.velocityY, golden.velocityX)
+            : golden.heading;
         const rearX = golden.x - Math.cos(heading) * 30 * golden.size;
         const rearY = golden.y - Math.sin(heading) * 30 * golden.size;
         const count = Math.random() < 0.35 ? 2 : 1;
@@ -397,7 +534,9 @@ export class ArenaRenderer {
     context.fillStyle = light ? "#e6edf3" : "#101c24";
     context.fillRect(0, 0, this.worldWidth, this.worldHeight);
 
-    context.strokeStyle = light ? "rgba(54, 83, 108, 0.10)" : "rgba(163, 207, 216, 0.06)";
+    context.strokeStyle = light
+      ? "rgba(54, 83, 108, 0.10)"
+      : "rgba(163, 207, 216, 0.06)";
     context.lineWidth = 1;
     for (let x = 24; x < this.worldWidth; x += 48) {
       context.beginPath();
@@ -411,22 +550,36 @@ export class ArenaRenderer {
       context.lineTo(this.worldWidth, y);
       context.stroke();
     }
-
   }
 
-  private drawGoober(goober: Goober, elapsed: number, context = this.context, heading = goober.heading, selected = false): void {
+  private drawGoober(
+    goober: Goober,
+    elapsed: number,
+    context = this.context,
+    heading = goober.heading,
+    selected = false,
+  ): void {
     const bob = Math.sin(elapsed * 5 + goober.bobOffset) > 0.45 ? 1 : 0;
     const pixel = 6 * goober.size;
     const left = -pixel * 4.5;
     const top = -pixel * 4.5;
     if (goober.specialType === "glowy") {
       context.save();
-      context.globalAlpha = 0.2 + Math.sin(elapsed * 3 + goober.bobOffset) * 0.08;
+      context.globalAlpha =
+        0.2 + Math.sin(elapsed * 3 + goober.bobOffset) * 0.08;
       context.fillStyle = goober.color;
       context.shadowColor = goober.color;
       context.shadowBlur = pixel * 3;
       context.beginPath();
-      context.ellipse(goober.x, goober.y + bob, pixel * 8, pixel * 4.4, heading, 0, Math.PI * 2);
+      context.ellipse(
+        goober.x,
+        goober.y + bob,
+        pixel * 8,
+        pixel * 4.4,
+        heading,
+        0,
+        Math.PI * 2,
+      );
       context.fill();
       context.restore();
     }
@@ -451,14 +604,13 @@ export class ArenaRenderer {
       context.lineWidth = Math.max(1.5, pixel * 0.28);
       context.stroke();
     }
-    // A compact 9×9 pixel body. Eyes are separate so they can follow heading.
     const sprite = [
       "..kkkkk..",
       ".kccccck.",
       "kccccccck",
       "kccccccck",
       "kccccccck",
-      "kccccccck",
+      "kccececck",
       ".kccccck.",
       "..kccck..",
       "...kkk...",
@@ -466,9 +618,15 @@ export class ArenaRenderer {
     context.save();
     context.translate(goober.x, goober.y + bob);
     context.rotate(heading - Math.PI / 2);
-    const goldFill = goober.specialType === "golden"
-      ? context.createLinearGradient(-pixel * 4.5, -pixel * 4.5, pixel * 4.5, pixel * 4.5)
-      : null;
+    const goldFill =
+      goober.specialType === "golden"
+        ? context.createLinearGradient(
+            -pixel * 4.5,
+            -pixel * 4.5,
+            pixel * 4.5,
+            pixel * 4.5,
+          )
+        : null;
     if (goldFill) {
       goldFill.addColorStop(0, "#fff6b0");
       goldFill.addColorStop(0.24, "#ffd700");
@@ -477,14 +635,23 @@ export class ArenaRenderer {
       goldFill.addColorStop(1, "#c99700");
     }
     const rainbowColors = [
-      "#f52549", "#ff592b", "#ff9828", "#ffd52e", "#f4f13a",
-      "#4bd34d", "#20c9a5", "#2588f5", "#713be8",
+      "#f52549",
+      "#ff592b",
+      "#ff9828",
+      "#ffd52e",
+      "#f4f13a",
+      "#4bd34d",
+      "#20c9a5",
+      "#2588f5",
+      "#713be8",
     ];
     for (let y = 0; y < sprite.length; y++) {
       for (let x = 0; x < sprite[y].length; x++) {
         const shade = sprite[y][x];
         if (shade === ".") continue;
-        if (shade === "k") {
+        if (shade === "e") {
+          context.fillStyle = "#e8f4ff";
+        } else if (shade === "k") {
           context.fillStyle = "#07111a";
         } else if (goober.specialType === "golden") {
           context.fillStyle = goldFill!;
@@ -497,16 +664,5 @@ export class ArenaRenderer {
       }
     }
     context.restore();
-
-    const forwardX = Math.cos(heading);
-    const forwardY = Math.sin(heading);
-    const sideX = -forwardY;
-    const sideY = forwardX;
-    context.fillStyle = "#e8f4ff";
-    for (const side of [-1, 1]) {
-      const eyeX = goober.x + (forwardX * 1.15 + sideX * side * 1.05) * pixel;
-      const eyeY = goober.y + bob + (forwardY * 1.15 + sideY * side * 1.05) * pixel;
-      context.fillRect(eyeX - pixel / 2, eyeY - pixel / 2, pixel, pixel);
-    }
   }
 }
