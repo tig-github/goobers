@@ -65,7 +65,7 @@ export function mountApp(root: HTMLElement): void {
             <input id="admin-goober-speed" type="range" min="0.4" max="1.8" step="0.1" value="1">
             <label for="admin-goober-special">special type</label>
             <select id="admin-goober-special">
-              <option value="none">none</option><option value="tiny">tiny</option><option value="speedy">speedy</option><option value="orderly">orderly</option><option value="glowy">glowy</option><option value="golden">golden</option><option value="rainbow">rainbow</option><option value="chameleon">chameleon</option>
+              <option value="none">none</option><option value="tiny">tiny</option><option value="speedy">speedy</option><option value="orderly">orderly</option><option value="glowy">glowy</option><option value="golden">golden</option><option value="rainbow">rainbow</option><option value="chameleon">chameleon</option><option value="artist">artist</option>
             </select>
             <button class="admin-spawn-submit" type="submit">spawn goober</button>
             <span id="admin-spawn-status" role="status" aria-live="polite"></span>

@@ -1,6 +1,6 @@
 ﻿import type { Personality } from "./personalities";
 
-export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow" | "chameleon";
+export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow" | "chameleon" | "artist";
 export type OrderlyPattern = "triangle" | "circle" | "square";
 export const MIN_ORDERLY_RADIUS = 36;
 export const MAX_ORDERLY_RADIUS = 180;
@@ -31,6 +31,7 @@ export const SPECIAL_TYPE_CHANCES: Readonly<Record<SpecialType, number>> = {
   golden: 0,
   rainbow: 0,
   chameleon: 2.5,
+  artist: 2.5,
 };
 
 export class SpecialTypeRegistry {
@@ -93,6 +94,8 @@ export class SpecialTypeRegistry {
       case "rainbow":
         break;
       case "chameleon":
+        break;
+      case "artist":
         break;
     }
   }

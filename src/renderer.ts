@@ -1,4 +1,4 @@
-import type { Goober } from "./simulation";
+import type { ArtistPaint, Goober } from "./simulation";
 import { WORLD_HEIGHT, WORLD_WIDTH } from "./consts";
 import type { FieldEvent } from "./events";
 
@@ -42,6 +42,7 @@ export class ArenaRenderer {
     elapsed: number,
     selectedId: number | null = null,
     fieldEvent?: FieldEvent,
+    artistPaints: ArtistPaint[] = [],
   ): void {
     const now = performance.now();
     const delta =
@@ -102,7 +103,7 @@ export class ArenaRenderer {
     const scaleY = canvas.height / viewHeight;
     context.setTransform(scaleX, 0, 0, scaleY, -left * scaleX, -top * scaleY);
     context.clearRect(left, top, viewWidth, viewHeight);
-    this.drawField();
+    this.drawField(artistPaints);
     if (fieldEvent) this.drawFieldEvent(fieldEvent, elapsed, goobers);
     this.drawRainbowTrail(fieldEvent, elapsed, goobers);
     this.drawGassyTrails(fieldEvent, elapsed, goobers);
@@ -528,11 +529,19 @@ export class ArenaRenderer {
     context.restore();
   }
 
-  private drawField(): void {
+  private drawField(artistPaints: ArtistPaint[] = []): void {
     const context = this.context;
     const light = this.theme === "light";
     context.fillStyle = light ? "#e6edf3" : "#101c24";
     context.fillRect(0, 0, this.worldWidth, this.worldHeight);
+
+    for (const paint of artistPaints) {
+      const alpha = paint.age <= 10 ? 1 : Math.max(0, 1 - (paint.age - 10) / 10);
+      context.globalAlpha = alpha * 0.94;
+      context.fillStyle = paint.color;
+      context.fillRect(paint.x * 48 - 24, paint.y * 48 - 24, 48, 48);
+    }
+    context.globalAlpha = 1;
 
     context.strokeStyle = light
       ? "rgba(54, 83, 108, 0.10)"
@@ -560,6 +569,9 @@ export class ArenaRenderer {
     selected = false,
   ): void {
     const bob = Math.sin(elapsed * 5 + goober.bobOffset) > 0.45 ? 1 : 0;
+    const artistWiggle = goober.isArtistPainting
+      ? Math.sin(elapsed * 24 + goober.bobOffset) * 0.075
+      : 0;
     const pixel = 6 * goober.size;
     const left = -pixel * 4.5;
     const top = -pixel * 4.5;
@@ -617,7 +629,7 @@ export class ArenaRenderer {
     ];
     context.save();
     context.translate(goober.x, goober.y + bob);
-    context.rotate(heading - Math.PI / 2);
+    context.rotate(heading - Math.PI / 2 + artistWiggle);
     const goldFill =
       goober.specialType === "golden"
         ? context.createLinearGradient(

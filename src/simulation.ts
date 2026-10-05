@@ -34,6 +34,20 @@ export interface Goober {
   hasLeftField?: boolean;
   rainbowSpinTurns?: number;
   isRainbowSpinning?: boolean;
+  artistCellX?: number;
+  artistCellY?: number;
+  artistDwell?: number;
+  artistPaintedCell?: boolean;
+  isArtistPainting?: boolean;
+  artistBreakRemaining?: number;
+  artistNextBreak?: number;
+}
+
+export interface ArtistPaint {
+  x: number;
+  y: number;
+  color: string;
+  age: number;
 }
 
 export type GooberLoadout = Pick<Goober, "color" | "personality" | "personalityStrength" | "size" | "speedFactor" | "preferredCorner" | "specialType" | "orderlyPattern" | "orderlyRadius">;
@@ -191,6 +205,7 @@ export function stepSimulation(
   width: number,
   height: number,
   fieldEvent?: FieldEvent,
+  artistPaints: ArtistPaint[] = [],
 ): void {
   if (deltaSeconds <= 0) return;
 
@@ -233,6 +248,55 @@ export function stepSimulation(
       const clearMargin = 32 * goober.size + 12 + trailClearance;
       goober.hasLeftField = goober.x < -clearMargin || goober.x > width + clearMargin || goober.y < -clearMargin || goober.y > height + clearMargin;
       continue;
+    }
+    if (goober.specialType === "artist") {
+      goober.artistNextBreak ??= 25 + Math.random() * 55;
+      if ((goober.artistBreakRemaining ?? 0) > 0) {
+        goober.artistBreakRemaining = Math.max(0, goober.artistBreakRemaining! - deltaSeconds);
+      } else {
+        goober.artistNextBreak -= deltaSeconds;
+        if (goober.artistNextBreak <= 0) {
+          goober.artistBreakRemaining = 5 + Math.random() * 40;
+          goober.artistNextBreak = 25 + Math.random() * 55;
+        }
+      }
+      const takingBreak = (goober.artistBreakRemaining ?? 0) > 0;
+      if (takingBreak) {
+        goober.isArtistPainting = false;
+        goober.artistCellX = undefined;
+        goober.artistCellY = undefined;
+        goober.artistDwell = 0;
+        goober.artistPaintedCell = false;
+      } else {
+      // Visible grid lines are offset by 24 units from the world's 48-unit
+      // coordinate boundaries, so artist cells follow the drawn squares.
+      const cellX = Math.floor((goober.x + 24) / 48);
+      const cellY = Math.floor((goober.y + 24) / 48);
+      if (cellX !== goober.artistCellX || cellY !== goober.artistCellY) {
+        goober.artistCellX = cellX;
+        goober.artistCellY = cellY;
+        goober.artistDwell = 0;
+        goober.artistPaintedCell = false;
+      }
+      if (!goober.artistPaintedCell) {
+        goober.artistDwell = (goober.artistDwell ?? 0) + deltaSeconds;
+        if (goober.artistDwell < 5) {
+          goober.isArtistPainting = true;
+          continue;
+        }
+        const existing = artistPaints.find((paint) => paint.x === cellX && paint.y === cellY);
+        if (existing) {
+          existing.color = goober.color;
+          existing.age = 0;
+        } else {
+          artistPaints.push({ x: cellX, y: cellY, color: goober.color, age: 0 });
+        }
+        goober.artistPaintedCell = true;
+        goober.isArtistPainting = false;
+      }
+      }
+    } else {
+      goober.isArtistPainting = false;
     }
     if (goober.specialType === "chameleon") {
       let nearestColorSource: Goober | null = null;
@@ -501,6 +565,10 @@ export function stepSimulation(
   }
 
   if (congaLine.length > 1) separateCongaGoobers(congaLine, width, height);
+  for (const paint of artistPaints) paint.age += deltaSeconds;
+  for (let index = artistPaints.length - 1; index >= 0; index--) {
+    if (artistPaints[index].age >= 20) artistPaints.splice(index, 1);
+  }
 }
 
 function separateCongaGoobers(line: Goober[], width: number, height: number): void {

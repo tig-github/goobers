@@ -10,6 +10,7 @@ import {
   stepSimulation,
   type Goober,
   type GooberLoadout,
+  type ArtistPaint,
 } from "./simulation";
 import { ArenaRenderer } from "./renderer";
 import { DEFAULT_ZOOM, MAX_GOOBERS, MAX_ZOOM, MIN_ZOOM } from "./consts";
@@ -69,6 +70,7 @@ const zoomInput = document.querySelector<HTMLInputElement>("#zoom-control")!;
 const zoomOutput = document.querySelector<HTMLOutputElement>("#zoom-value")!;
 let fieldScale = 1;
 let goobers = createStartingGoobers();
+const artistPaints: ArtistPaint[] = [];
 const savedLoadouts: { name: string; loadout: GooberLoadout }[] = [];
 type NotebookEntry = { name: string; goober: Goober; favorite: boolean };
 const NOTEBOOK_PAGE_SIZE = 6;
@@ -81,6 +83,7 @@ const SPECIAL_TYPES: readonly SpecialType[] = [
   "golden",
   "rainbow",
   "chameleon",
+  "artist",
 ];
 const notebookData = {
   personalities: new Set<string>(),
@@ -980,6 +983,7 @@ function animate(timestamp: number): void {
       renderer.worldWidth,
       renderer.worldHeight,
       activeEvent ?? undefined,
+      artistPaints,
     );
     const departedEventGoober = goobers.some((goober) => goober.isEventGoober && goober.hasLeftField);
     goobers = goobers.filter((goober) => !goober.hasLeftField);
@@ -1019,6 +1023,7 @@ function animate(timestamp: number): void {
     elapsedSeconds,
     selectedGooberId,
     activeEvent ?? undefined,
+    artistPaints,
   );
   if (selectedNotebookEntry) {
     const notebookGoober = selectedNotebookEntry.goober;
