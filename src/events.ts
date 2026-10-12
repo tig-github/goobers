@@ -39,6 +39,11 @@ export interface GassyEvent extends TimedFieldEvent {
 
 export type FieldEvent = GatheringEvent | DriftEvent | ColorParadeEvent | CongaLineEvent | GoldenGooberEvent | RainbowGooberEvent | GassyEvent;
 
+/** Events that temporarily take control of orderly goobers' movement. */
+export function suspendsOrderlyPatterns(event: FieldEvent | undefined): boolean {
+  return event?.type === "drift" || event?.type === "color-parade";
+}
+
 const EVENT_DURATION_SECONDS = 30;
 const COLOR_PARADE_DURATION_SECONDS = 60;
 const CONGA_LINE_DURATION_SECONDS = 90;
@@ -50,6 +55,20 @@ const EVENT_CHANCE_PER_CHECK = 1 / 240;
 const FIELD_EDGE_PADDING = 100;
 const INITIAL_EVENT_DELAY_SECONDS = 60;
 const RANDOM_EVENT_TYPES: readonly FieldEventType[] = ["gathering", "drift", "color-parade", "conga-line", "golden-goober", "gassy"];
+
+function eventDuration(type: FieldEventType): number {
+  switch (type) {
+    case "golden-goober":
+    case "rainbow-goober":
+      return GOLDEN_GOOBER_DURATION_SECONDS + (Math.random() * 2 - 1) * GOLDEN_GOOBER_DURATION_VARIATION_SECONDS;
+    case "color-parade":
+      return COLOR_PARADE_DURATION_SECONDS;
+    case "conga-line":
+      return CONGA_LINE_DURATION_SECONDS;
+    default:
+      return EVENT_DURATION_SECONDS;
+  }
+}
 
 export class EventSystem {
   private activeEvent: FieldEvent | null = null;
@@ -77,13 +96,7 @@ export class EventSystem {
     } else {
       this.activeEvent = {
         type,
-        remainingSeconds: type === "golden-goober" || type === "rainbow-goober"
-          ? GOLDEN_GOOBER_DURATION_SECONDS + (Math.random() * 2 - 1) * GOLDEN_GOOBER_DURATION_VARIATION_SECONDS
-          : type === "color-parade"
-          ? COLOR_PARADE_DURATION_SECONDS
-          : type === "conga-line"
-            ? CONGA_LINE_DURATION_SECONDS
-            : EVENT_DURATION_SECONDS,
+        remainingSeconds: eventDuration(type),
       };
     }
     this.checkElapsed = 0;

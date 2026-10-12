@@ -1,63 +1,9 @@
 ﻿import { DEFAULT_GOOBER_COLOR, MAX_GOOBER_SPEED_UNITS, WORLD_HEIGHT, WORLD_WIDTH } from "./consts";
 import { chooseSpawnPersonality, PERSONALITIES_BY_ID, type Personality } from "./personalities";
-import { MAX_ORDERLY_RADIUS, randomOrderlyRadius, specialTypeRegistry, type OrderlyPattern, type SpecialType } from "./special-types";
-import type { FieldEvent } from "./events";
-
-export interface Goober {
-  id: number;
-  name: string;
-  x: number;
-  y: number;
-  velocityX: number;
-  velocityY: number;
-  heading: number;
-  wanderAngle: number;
-  nextTurn: number;
-  size: number;
-  bobOffset: number;
-  color: string;
-  personality: Personality;
-  personalityStrength: number;
-  speedFactor: number;
-  preferredCorner: number;
-  specialType: SpecialType | null;
-  orderlyPattern?: OrderlyPattern;
-  patternOriginX?: number;
-  patternOriginY?: number;
-  patternDistance?: number;
-  orderlyRadius?: number;
-  isGoldenEventVisitor?: boolean;
-  isRainbowEventVisitor?: boolean;
-  isEventGoober?: boolean;
-  isGoldenLeaving?: boolean;
-  isEventVisitorLeaving?: boolean;
-  hasLeftField?: boolean;
-  rainbowSpinTurns?: number;
-  isRainbowSpinning?: boolean;
-  artistCellX?: number;
-  artistCellY?: number;
-  artistDwell?: number;
-  artistPaintedCell?: boolean;
-  isArtistPainting?: boolean;
-  artistBreakRemaining?: number;
-  artistNextBreak?: number;
-  homeX?: number;
-  homeY?: number;
-  explorerX?: number;
-  explorerY?: number;
-  napRemaining?: number;
-  nextNap?: number;
-  dizzyPhase?: number;
-  playfulTargetId?: number;
-  orbitDirection?: number;
-}
-
-export interface ArtistPaint {
-  x: number;
-  y: number;
-  color: string;
-  age: number;
-}
+import { initializeOrderlyPath, MAX_ORDERLY_RADIUS, specialTypeRegistry } from "./special-types";
+import { suspendsOrderlyPatterns, type FieldEvent } from "./events";
+import type { ArtistPaint, Goober } from "./goober";
+export type { ArtistPaint, Goober } from "./goober";
 
 export type GooberLoadout = Pick<Goober, "color" | "personality" | "personalityStrength" | "size" | "speedFactor" | "preferredCorner" | "specialType" | "orderlyPattern" | "orderlyRadius">;
 
@@ -78,21 +24,7 @@ export function saveGooberLoadout(goober: Goober): GooberLoadout {
 export function spawnGooberFromLoadout(loadout: GooberLoadout, width = WORLD_WIDTH, height = WORLD_HEIGHT): Goober {
   const goober = createGoobers(1, loadout.color, width, height)[0];
   Object.assign(goober, loadout);
-  if (loadout.specialType === "orderly" && loadout.orderlyPattern) {
-    const radius = loadout.orderlyRadius ?? randomOrderlyRadius();
-    goober.orderlyRadius = radius;
-    if (loadout.orderlyPattern === "circle") {
-      goober.patternOriginX = goober.x - radius;
-      goober.patternOriginY = goober.y;
-    } else if (loadout.orderlyPattern === "triangle") {
-      goober.patternOriginX = goober.x;
-      goober.patternOriginY = goober.y + radius;
-    } else {
-      goober.patternOriginX = goober.x + radius;
-      goober.patternOriginY = goober.y + radius;
-    }
-    goober.patternDistance = 0;
-  }
+  if (loadout.specialType === "orderly" && loadout.orderlyPattern) initializeOrderlyPath(goober);
   return goober;
 }
 
@@ -159,13 +91,7 @@ export function createGoldenEventGoober(width: number, height: number): Goober {
   goober.specialType = "golden";
   goober.isGoldenEventVisitor = true;
   goober.isEventGoober = true;
-  const edge = Math.floor(Math.random() * 4);
-  if (edge === 0) { goober.x = 34; goober.y = Math.random() * height; goober.velocityX = Math.abs(goober.velocityX) + 18; }
-  else if (edge === 1) { goober.x = width - 34; goober.y = Math.random() * height; goober.velocityX = -Math.abs(goober.velocityX) - 18; }
-  else if (edge === 2) { goober.x = Math.random() * width; goober.y = 34; goober.velocityY = Math.abs(goober.velocityY) + 18; }
-  else { goober.x = Math.random() * width; goober.y = height - 34; goober.velocityY = -Math.abs(goober.velocityY) - 18; }
-  goober.heading = Math.atan2(goober.velocityY, goober.velocityX);
-  goober.wanderAngle = goober.heading;
+  setGooberAtRandomEdge(goober, width, height);
   return goober;
 }
 
@@ -193,18 +119,8 @@ function setGooberAtRandomEdge(goober: Goober, width: number, height: number): v
 export function resumeOrderlyPaths(goobers: Goober[]): void {
   for (const goober of goobers) {
     if (goober.specialType !== "orderly" || !goober.orderlyPattern) continue;
-    const radius = goober.orderlyRadius ?? 58;
-    if (goober.orderlyPattern === "circle") {
-      goober.patternOriginX = goober.x - radius;
-      goober.patternOriginY = goober.y;
-    } else if (goober.orderlyPattern === "triangle") {
-      goober.patternOriginX = goober.x;
-      goober.patternOriginY = goober.y + radius;
-    } else {
-      goober.patternOriginX = goober.x + radius;
-      goober.patternOriginY = goober.y + radius;
-    }
-    goober.patternDistance = 0;
+    goober.orderlyRadius ??= 58;
+    initializeOrderlyPath(goober);
   }
 }
 
@@ -237,76 +153,10 @@ export function stepSimulation(
 
   for (const goober of goobers) {
     if (goober.isGoldenLeaving || goober.isEventVisitorLeaving) {
-      const distances = [goober.x, width - goober.x, goober.y, height - goober.y];
-      const nearestEdge = distances.indexOf(Math.min(...distances));
-      const targets = [
-        { x: -60, y: goober.y },
-        { x: width + 60, y: goober.y },
-        { x: goober.x, y: -60 },
-        { x: goober.x, y: height + 60 },
-      ];
-      const target = targets[nearestEdge];
-      const angle = Math.atan2(target.y - goober.y, target.x - goober.x);
-      const pace = MAX_GOOBER_SPEED_UNITS * goober.speedFactor * 4;
-      goober.velocityX = Math.cos(angle) * pace;
-      goober.velocityY = Math.sin(angle) * pace;
-      goober.x += goober.velocityX * deltaSeconds;
-      goober.y += goober.velocityY * deltaSeconds;
-      goober.heading = angle;
-      const trailClearance = goober.isRainbowEventVisitor ? pace * 1.4 : 0;
-      const clearMargin = 32 * goober.size + 12 + trailClearance;
-      goober.hasLeftField = goober.x < -clearMargin || goober.x > width + clearMargin || goober.y < -clearMargin || goober.y > height + clearMargin;
+      stepLeavingGoober(goober, deltaSeconds, width, height);
       continue;
     }
-    if (goober.specialType === "artist") {
-      goober.artistNextBreak ??= 25 + Math.random() * 55;
-      if ((goober.artistBreakRemaining ?? 0) > 0) {
-        goober.artistBreakRemaining = Math.max(0, goober.artistBreakRemaining! - deltaSeconds);
-      } else {
-        goober.artistNextBreak -= deltaSeconds;
-        if (goober.artistNextBreak <= 0) {
-          goober.artistBreakRemaining = 5 + Math.random() * 40;
-          goober.artistNextBreak = 25 + Math.random() * 55;
-        }
-      }
-      const takingBreak = (goober.artistBreakRemaining ?? 0) > 0;
-      if (takingBreak) {
-        goober.isArtistPainting = false;
-        goober.artistCellX = undefined;
-        goober.artistCellY = undefined;
-        goober.artistDwell = 0;
-        goober.artistPaintedCell = false;
-      } else {
-      // Visible grid lines are offset by 24 units from the world's 48-unit
-      // coordinate boundaries, so artist cells follow the drawn squares.
-      const cellX = Math.floor((goober.x + 24) / 48);
-      const cellY = Math.floor((goober.y + 24) / 48);
-      if (cellX !== goober.artistCellX || cellY !== goober.artistCellY) {
-        goober.artistCellX = cellX;
-        goober.artistCellY = cellY;
-        goober.artistDwell = 0;
-        goober.artistPaintedCell = false;
-      }
-      if (!goober.artistPaintedCell) {
-        goober.artistDwell = (goober.artistDwell ?? 0) + deltaSeconds;
-        if (goober.artistDwell < 5) {
-          goober.isArtistPainting = true;
-          continue;
-        }
-        const existing = artistPaints.find((paint) => paint.x === cellX && paint.y === cellY);
-        if (existing) {
-          existing.color = goober.color;
-          existing.age = 0;
-        } else {
-          artistPaints.push({ x: cellX, y: cellY, color: goober.color, age: 0 });
-        }
-        goober.artistPaintedCell = true;
-        goober.isArtistPainting = false;
-      }
-      }
-    } else {
-      goober.isArtistPainting = false;
-    }
+    if (stepArtistGoober(goober, deltaSeconds, artistPaints)) continue;
     if (goober.personality === "sleepy") {
       goober.nextNap ??= 25 + Math.random() * 45;
       if ((goober.napRemaining ?? 0) > 0) {
@@ -348,7 +198,7 @@ export function stepSimulation(
       goober.velocityY = 0;
       continue;
     }
-    if ((!fieldEvent || fieldEvent.type === "gathering" || fieldEvent.type === "conga-line" || fieldEvent.type === "golden-goober" || fieldEvent.type === "rainbow-goober" || fieldEvent.type === "gassy") && goober.specialType === "orderly" && goober.orderlyPattern && !(fieldEvent?.type === "rainbow-goober" && (goober.rainbowSpinTurns ?? 0) >= 5)) {
+    if (!suspendsOrderlyPatterns(fieldEvent) && goober.specialType === "orderly" && goober.orderlyPattern && !(fieldEvent?.type === "rainbow-goober" && (goober.rainbowSpinTurns ?? 0) >= 5)) {
       stepOrderlyGoober(goober, deltaSeconds, width, height);
       continue;
     }
@@ -695,6 +545,83 @@ export function stepSimulation(
   for (let index = artistPaints.length - 1; index >= 0; index--) {
     if (artistPaints[index].age >= 20) artistPaints.splice(index, 1);
   }
+}
+
+function stepLeavingGoober(goober: Goober, deltaSeconds: number, width: number, height: number): void {
+  const distances = [goober.x, width - goober.x, goober.y, height - goober.y];
+  const nearestEdge = distances.indexOf(Math.min(...distances));
+  const targets = [
+    { x: -60, y: goober.y },
+    { x: width + 60, y: goober.y },
+    { x: goober.x, y: -60 },
+    { x: goober.x, y: height + 60 },
+  ];
+  const target = targets[nearestEdge];
+  const angle = Math.atan2(target.y - goober.y, target.x - goober.x);
+  const pace = MAX_GOOBER_SPEED_UNITS * goober.speedFactor * 4;
+  goober.velocityX = Math.cos(angle) * pace;
+  goober.velocityY = Math.sin(angle) * pace;
+  goober.x += goober.velocityX * deltaSeconds;
+  goober.y += goober.velocityY * deltaSeconds;
+  goober.heading = angle;
+  const trailClearance = goober.isRainbowEventVisitor ? pace * 1.4 : 0;
+  const clearMargin = 32 * goober.size + 12 + trailClearance;
+  goober.hasLeftField = goober.x < -clearMargin || goober.x > width + clearMargin || goober.y < -clearMargin || goober.y > height + clearMargin;
+}
+
+function stepArtistGoober(goober: Goober, deltaSeconds: number, artistPaints: ArtistPaint[]): boolean {
+  if (goober.specialType !== "artist") {
+    goober.isArtistPainting = false;
+    return false;
+  }
+
+  goober.artistNextBreak ??= 25 + Math.random() * 55;
+  if ((goober.artistBreakRemaining ?? 0) > 0) {
+    goober.artistBreakRemaining = Math.max(0, goober.artistBreakRemaining! - deltaSeconds);
+  } else {
+    goober.artistNextBreak -= deltaSeconds;
+    if (goober.artistNextBreak <= 0) {
+      goober.artistBreakRemaining = 5 + Math.random() * 40;
+      goober.artistNextBreak = 25 + Math.random() * 55;
+    }
+  }
+
+  if ((goober.artistBreakRemaining ?? 0) > 0) {
+    goober.isArtistPainting = false;
+    goober.artistCellX = undefined;
+    goober.artistCellY = undefined;
+    goober.artistDwell = 0;
+    goober.artistPaintedCell = false;
+    return false;
+  }
+
+  // Grid lines are offset 24 units from each 48-unit world boundary.
+  const cellX = Math.floor((goober.x + 24) / 48);
+  const cellY = Math.floor((goober.y + 24) / 48);
+  if (cellX !== goober.artistCellX || cellY !== goober.artistCellY) {
+    goober.artistCellX = cellX;
+    goober.artistCellY = cellY;
+    goober.artistDwell = 0;
+    goober.artistPaintedCell = false;
+  }
+  if (goober.artistPaintedCell) return false;
+
+  goober.artistDwell = (goober.artistDwell ?? 0) + deltaSeconds;
+  if (goober.artistDwell < 5) {
+    goober.isArtistPainting = true;
+    return true;
+  }
+
+  const existing = artistPaints.find((paint) => paint.x === cellX && paint.y === cellY);
+  if (existing) {
+    existing.color = goober.color;
+    existing.age = 0;
+  } else {
+    artistPaints.push({ x: cellX, y: cellY, color: goober.color, age: 0 });
+  }
+  goober.artistPaintedCell = true;
+  goober.isArtistPainting = false;
+  return false;
 }
 
 function separateCongaGoobers(line: Goober[], width: number, height: number): void {

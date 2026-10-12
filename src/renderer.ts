@@ -1,4 +1,4 @@
-import type { ArtistPaint, Goober } from "./simulation";
+import type { ArtistPaint, Goober } from "./goober";
 import { WORLD_HEIGHT, WORLD_WIDTH } from "./consts";
 import type { FieldEvent } from "./events";
 

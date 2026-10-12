@@ -1,15 +1,11 @@
 import {
   DEFAULT_GOOBER_COLOR,
-  DEFAULT_GOOBER_SPEED,
   DEFAULT_STARTING_GOOBERS,
   DEFAULT_ZOOM,
   FIELD_SCALE_STEP,
-  GOOBER_SPEED_STEP,
   MAX_FIELD_SCALE,
-  MAX_GOOBER_SPEED,
   MAX_ZOOM,
   MIN_FIELD_SCALE,
-  MIN_GOOBER_SPEED,
   ZOOM_STEP,
 } from "../consts";
 import { PERSONALITIES } from "../personalities";
@@ -24,7 +20,7 @@ export function mountApp(root: HTMLElement): void {
   <aside id="badges-panel" class="notebook-panel badges-panel" aria-label="Badges" hidden></aside>
   <div id="badge-toasts" class="badge-toasts" aria-live="polite" aria-atomic="false"></div>
   <main>
-    <header class="heading"><h1>goobers<span>.</span></h1><div class="heading-actions"><button id="admin-toggle" type="button" aria-controls="admin-panel" aria-expanded="false">admin</button><div class="live"><i></i><span id="run-state">wandering</span></div></div></header>
+    <header class="heading"><h1>goobers<span>.</span></h1><div class="heading-actions"><button id="admin-toggle" type="button" aria-controls="admin-panel" aria-expanded="false" hidden>admin</button><div class="live"><i></i><span id="run-state">wandering</span></div><span class="version-label">indev 1.0</span></div></header>
     <section class="arena-layout" aria-label="Goober field and details">
       <section id="saved-loadouts" class="saved-loadouts" aria-label="Saved goober loadouts" hidden>
         <div class="saved-loadouts-heading"><strong>saved loadouts</strong><span id="loadout-count">none yet</span></div>
@@ -88,7 +84,7 @@ export function mountApp(root: HTMLElement): void {
         <button id="population-down" type="button">− remove</button>
         <button id="population-up" class="add-button" type="button">+ add</button>
       </div>
-      <div class="field-actions"><label for="speed-control">speed <output id="speed-value">${DEFAULT_GOOBER_SPEED.toFixed(1)}×</output></label><input id="speed-control" type="range" min="${MIN_GOOBER_SPEED}" max="${MAX_GOOBER_SPEED}" step="${GOOBER_SPEED_STEP}" value="${DEFAULT_GOOBER_SPEED}" aria-label="Wander speed"><button id="theme-control" type="button">light mode</button><button id="pause-control" type="button"><span id="pause-label">pause</span></button><button id="reset-control" type="button">reset</button></div>
+      <div class="field-actions"><button id="theme-control" type="button">light mode</button><button id="reset-control" type="button">reset</button></div>
     </section>
     <section class="view-controls" aria-label="Field size and view controls">
       <label for="field-size">field size <output id="field-size-value">1.00×</output></label>
@@ -98,7 +94,7 @@ export function mountApp(root: HTMLElement): void {
       <span class="pan-hint">drag field to pan</span>
       <button id="view-reset" type="button">reset view</button>
     </section>
-    <footer><span>small creatures, no particular place to be</span><span id="field-clock">00:00</span></footer>
+    <footer><span id="field-clock">00:00</span></footer>
   </main>
 `;
 }

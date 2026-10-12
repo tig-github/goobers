@@ -1,7 +1,6 @@
-﻿import type { Personality } from "./personalities";
+import type { SpecialGoober, SpecialType } from "./goober";
+export type { OrderlyPattern, SpecialType } from "./goober";
 
-export type SpecialType = "tiny" | "speedy" | "orderly" | "glowy" | "golden" | "rainbow" | "chameleon" | "artist";
-export type OrderlyPattern = "triangle" | "circle" | "square";
 export const MIN_ORDERLY_RADIUS = 36;
 export const MAX_ORDERLY_RADIUS = 180;
 
@@ -9,19 +8,22 @@ export function randomOrderlyRadius(): number {
   return MIN_ORDERLY_RADIUS + Math.random() * (MAX_ORDERLY_RADIUS - MIN_ORDERLY_RADIUS);
 }
 
-export interface SpecialGoober {
-  x: number;
-  y: number;
-  size: number;
-  speedFactor: number;
-  personality: Personality;
-  specialType: SpecialType | null;
-  orderlyPattern?: OrderlyPattern;
-  patternOriginX?: number;
-  patternOriginY?: number;
-  patternDistance?: number;
-  orderlyRadius?: number;
+export function initializeOrderlyPath(goober: SpecialGoober): void {
+  const radius = goober.orderlyRadius ?? randomOrderlyRadius();
+  goober.orderlyRadius = radius;
+  if (goober.orderlyPattern === "circle") {
+    goober.patternOriginX = goober.x - radius;
+    goober.patternOriginY = goober.y;
+  } else if (goober.orderlyPattern === "triangle") {
+    goober.patternOriginX = goober.x;
+    goober.patternOriginY = goober.y + radius;
+  } else {
+    goober.patternOriginX = goober.x + radius;
+    goober.patternOriginY = goober.y + radius;
+  }
+  goober.patternDistance = 0;
 }
+
 
 export const SPECIAL_TYPE_CHANCES: Readonly<Record<SpecialType, number>> = {
   tiny: 2.5,
@@ -73,29 +75,7 @@ export class SpecialTypeRegistry {
       case "orderly":
         goober.personality = "orderly";
         goober.orderlyPattern = (["triangle", "circle", "square"] as const)[Math.floor(Math.random() * 3)];
-        goober.patternDistance = 0;
-        const radius = randomOrderlyRadius();
-        goober.orderlyRadius = radius;
-        if (goober.orderlyPattern === "circle") {
-          goober.patternOriginX = goober.x - radius;
-          goober.patternOriginY = goober.y;
-        } else if (goober.orderlyPattern === "triangle") {
-          goober.patternOriginX = goober.x;
-          goober.patternOriginY = goober.y + radius;
-        } else {
-          goober.patternOriginX = goober.x + radius;
-          goober.patternOriginY = goober.y + radius;
-        }
-        break;
-      case "glowy":
-        break;
-      case "golden":
-        break;
-      case "rainbow":
-        break;
-      case "chameleon":
-        break;
-      case "artist":
+        initializeOrderlyPath(goober);
         break;
     }
   }

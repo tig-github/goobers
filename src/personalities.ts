@@ -37,17 +37,18 @@ export const PERSONALITIES: readonly PersonalityDefinition[] = [
 export const PERSONALITIES_BY_ID: Readonly<Record<Personality, PersonalityDefinition>> =
   Object.fromEntries(PERSONALITIES.map((personality) => [personality.id, personality])) as Record<Personality, PersonalityDefinition>;
 
-export const SPAWN_PERSONALITIES: readonly Personality[] = PERSONALITIES
-  .filter((personality) => personality.availableAtSpawn)
+const SPAWN_PERSONALITY_DEFINITIONS = PERSONALITIES
+  .filter((personality) => personality.availableAtSpawn);
+
+export const SPAWN_PERSONALITIES: readonly Personality[] = SPAWN_PERSONALITY_DEFINITIONS
   .map((personality) => personality.id);
 
 export function chooseSpawnPersonality(random = Math.random): Personality {
-  const available = PERSONALITIES.filter(({ availableAtSpawn }) => availableAtSpawn);
-  const totalWeight = available.reduce((sum, personality) => sum + personality.spawnWeight, 0);
+  const totalWeight = SPAWN_PERSONALITY_DEFINITIONS.reduce((sum, personality) => sum + personality.spawnWeight, 0);
   let roll = random() * totalWeight;
-  for (const personality of available) {
+  for (const personality of SPAWN_PERSONALITY_DEFINITIONS) {
     roll -= personality.spawnWeight;
     if (roll < 0) return personality.id;
   }
-  return available[available.length - 1].id;
+  return SPAWN_PERSONALITY_DEFINITIONS[SPAWN_PERSONALITY_DEFINITIONS.length - 1].id;
 }

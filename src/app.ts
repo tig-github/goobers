@@ -8,10 +8,9 @@ import {
   saveGooberLoadout,
   spawnGooberFromLoadout,
   stepSimulation,
-  type Goober,
   type GooberLoadout,
-  type ArtistPaint,
 } from "./simulation";
+import type { ArtistPaint, Goober } from "./goober";
 import { ArenaRenderer } from "./renderer";
 import { DEFAULT_ZOOM, MAX_GOOBERS, MAX_ZOOM, MIN_ZOOM } from "./consts";
 import { mountApp } from "./app/view";
@@ -36,11 +35,6 @@ const customColorInput =
 colorInput.addEventListener("change", () => {
   customColorInput.hidden = colorInput.value !== "custom";
 });
-const speedInput = document.querySelector<HTMLInputElement>("#speed-control")!;
-const speedOutput = document.querySelector<HTMLOutputElement>("#speed-value")!;
-const pauseButton =
-  document.querySelector<HTMLButtonElement>("#pause-control")!;
-const pauseLabel = document.querySelector<HTMLSpanElement>("#pause-label")!;
 const runState = document.querySelector<HTMLSpanElement>("#run-state")!;
 const clock = document.querySelector<HTMLSpanElement>("#field-clock")!;
 const eventIndicator =
@@ -124,7 +118,6 @@ let notebookUnlocked = false;
 let selectedGooberId: number | null = null;
 let followedGooberId: number | null = null;
 let clearUnlocked = false;
-let isPaused = false;
 let elapsedSeconds = 0;
 const eventSystem = new EventSystem();
 let activeEvent: FieldEvent | null = null;
@@ -216,7 +209,7 @@ function updateNotebook(): void {
   const header = document.createElement("div");
   header.className = "notebook-heading";
   const title = document.createElement("div");
-  title.innerHTML = `<span class="detail-kicker">FIELD NOTES</span><h2>${selectedNotebookEntry === null ? "goober notebook" : "goober profile"}</h2>`;
+  title.innerHTML = `<h2>${selectedNotebookEntry === null ? "goober notebook" : "goober profile"}</h2>`;
   const close = document.createElement("button");
   close.type = "button";
   close.className = "detail-close";
@@ -588,7 +581,7 @@ function updateGooberDetails(): void {
     traits.splice(1, 0, ["Special type", specialName]);
   }
   detailsPanel.innerHTML = `
-    <div class="detail-heading"><div><span class="detail-kicker">GOOBER FILE</span><input class="goober-name" type="text" maxlength="24" aria-label="Goober name" title="Rename this goober"></div><button class="detail-close" type="button" aria-label="Close goober details">×</button></div>
+    <div class="detail-heading"><div><input class="goober-name" type="text" maxlength="24" aria-label="Goober name" title="Rename this goober"></div><button class="detail-close" type="button" aria-label="Close goober details">×</button></div>
     <div class="portrait-wrap"><canvas id="goober-portrait" aria-label="Portrait of Goober #${selected.id + 1}"></canvas></div>
     <dl class="trait-list">${traits.map(([label, value]) => `<div><dt>${label}</dt><dd>${label === "Color" ? `<span class="color-swatch" style="--swatch:${value}"></span>${value}` : value}</dd></div>`).join("")}</dl>
     <div class="detail-actions"><button class="follow-goober" type="button" aria-pressed="${followedGooberId === selected.id}">${followedGooberId === selected.id ? "stop following" : "follow"}</button><button class="save-loadout" type="button" ${alreadySaved ? "disabled" : ""}>${alreadySaved ? "loadout already saved" : "save this loadout"}</button>${notebookUnlocked ? `<button class="notebook-save" type="button" ${alreadyInNotebook ? "disabled" : ""}>${alreadyInNotebook ? "in notebook" : "save to notebook"}</button>` : ""}<button class="kill-goober" type="button">kill goober</button></div>
@@ -687,17 +680,6 @@ function formatTime(seconds: number): string {
     .padStart(2, "0")}`;
 }
 
-function setPaused(paused: boolean): void {
-  isPaused = paused;
-  pauseLabel.textContent = paused ? "resume" : "pause";
-  runState.textContent = paused
-    ? "resting"
-    : activeEvent
-      ? activeEvent.type.replaceAll("-", " ")
-      : "wandering";
-  pauseButton.setAttribute("aria-pressed", String(paused));
-}
-
 document
   .querySelector<HTMLButtonElement>("#population-down")!
   .addEventListener("click", () => {
@@ -744,9 +726,6 @@ clearButton.addEventListener("click", () => {
   updatePopulationDisplay();
   updateGooberDetails();
   updateSavedLoadouts();
-});
-speedInput.addEventListener("input", () => {
-  speedOutput.value = `${Number(speedInput.value).toFixed(1)}×`;
 });
 fieldSizeInput.addEventListener("input", () => {
   fieldScale = Number(fieldSizeInput.value);
@@ -821,7 +800,6 @@ canvas.addEventListener("click", (event) => {
   selectedGooberId = selected?.id ?? null;
   updateGooberDetails();
 });
-pauseButton.addEventListener("click", () => setPaused(!isPaused));
 themeButton.addEventListener("click", () =>
   setTheme(theme === "dark" ? "light" : "dark"),
 );
@@ -931,18 +909,7 @@ document
     clock.textContent = formatTime(0);
     updatePopulationDisplay();
     updateSavedLoadouts();
-    setPaused(false);
   });
-window.addEventListener("keydown", (event: KeyboardEvent) => {
-  if (
-    event.code === "Space" &&
-    !(event.target instanceof HTMLInputElement) &&
-    !(event.target instanceof HTMLSelectElement)
-  ) {
-    event.preventDefault();
-    setPaused(!isPaused);
-  }
-});
 window.addEventListener("resize", updateIconSidebarPosition);
 
 function animate(timestamp: number): void {
@@ -952,7 +919,6 @@ function animate(timestamp: number): void {
       : Math.min((timestamp - previousFrame) / 1000, 0.05);
   previousFrame = timestamp;
   inspectGoobers();
-  if (!isPaused) {
     elapsedSeconds += deltaSeconds;
     const eventUpdate = eventSystem.update(
       deltaSeconds,
@@ -979,7 +945,7 @@ function animate(timestamp: number): void {
     activeEvent = eventUpdate.event;
     stepSimulation(
       goobers,
-      deltaSeconds * Number(speedInput.value),
+      deltaSeconds,
       renderer.worldWidth,
       renderer.worldHeight,
       activeEvent ?? undefined,
@@ -993,7 +959,6 @@ function animate(timestamp: number): void {
       updateGooberDetails();
     }
     clock.textContent = formatTime(elapsedSeconds);
-  }
   eventIndicator.hidden = !activeEvent;
   if (activeEvent) {
     const eventName = activeEvent.type.replaceAll("-", " ");
@@ -1013,11 +978,9 @@ function animate(timestamp: number): void {
                 : "goobers are following the line";
     eventIndicator.textContent = `${eventName} event: ${description} (${Math.ceil(activeEvent.remainingSeconds)}s)`;
   }
-  runState.textContent = isPaused
-    ? "resting"
-    : activeEvent
-      ? activeEvent.type.replaceAll("-", " ")
-      : "wandering";
+  runState.textContent = activeEvent
+    ? activeEvent.type.replaceAll("-", " ")
+    : "wandering";
   renderer.draw(
     goobers,
     elapsedSeconds,
