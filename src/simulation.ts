@@ -3,6 +3,8 @@ import { chooseSpawnPersonality, PERSONALITIES_BY_ID, type Personality } from ".
 import { initializeOrderlyPath, MAX_ORDERLY_RADIUS, specialTypeRegistry } from "./special-types";
 import { suspendsOrderlyPatterns, type FieldEvent } from "./events";
 import type { ArtistPaint, Goober } from "./goober";
+import type { RandomSource } from "./random";
+import { PERSONALITY_STEERING } from "./personality-steering";
 export type { ArtistPaint, Goober } from "./goober";
 
 export type GooberLoadout = Pick<Goober, "color" | "personality" | "personalityStrength" | "size" | "speedFactor" | "preferredCorner" | "specialType" | "orderlyPattern" | "orderlyRadius">;
@@ -21,47 +23,47 @@ export function saveGooberLoadout(goober: Goober): GooberLoadout {
   };
 }
 
-export function spawnGooberFromLoadout(loadout: GooberLoadout, width = WORLD_WIDTH, height = WORLD_HEIGHT): Goober {
-  const goober = createGoobers(1, loadout.color, width, height)[0];
+export function spawnGooberFromLoadout(loadout: GooberLoadout, width = WORLD_WIDTH, height = WORLD_HEIGHT, random: RandomSource = Math.random): Goober {
+  const goober = createGoobers(1, loadout.color, width, height, random)[0];
   Object.assign(goober, loadout);
-  if (loadout.specialType === "orderly" && loadout.orderlyPattern) initializeOrderlyPath(goober);
+  if (loadout.specialType === "orderly" && loadout.orderlyPattern) initializeOrderlyPath(goober, random);
   return goober;
 }
 
 let nextId = 0;
 
-export function createGoobers(count: number, color = DEFAULT_GOOBER_COLOR, width = WORLD_WIDTH, height = WORLD_HEIGHT): Goober[] {
+export function createGoobers(count: number, color = DEFAULT_GOOBER_COLOR, width = WORLD_WIDTH, height = WORLD_HEIGHT, random: RandomSource = Math.random): Goober[] {
   return Array.from({ length: count }, () => {
-    const personality = chooseSpawnPersonality();
+    const personality = chooseSpawnPersonality(random);
     return {
       id: nextId++,
       name: `Goober #${nextId}`,
-      x: 110 + Math.random() * Math.max(1, width - 220),
-      y: 95 + Math.random() * Math.max(1, height - 190),
-      velocityX: (Math.random() - 0.5) * 24,
-      velocityY: (Math.random() - 0.5) * 24,
-      heading: Math.random() * Math.PI * 2,
-      wanderAngle: Math.random() * Math.PI * 2,
-      nextTurn: 0.5 + Math.random() * 2,
-      size: 0.78 + Math.random() * 0.45,
-      bobOffset: Math.random() * Math.PI * 2,
+      x: 110 + random() * Math.max(1, width - 220),
+      y: 95 + random() * Math.max(1, height - 190),
+      velocityX: (random() - 0.5) * 24,
+      velocityY: (random() - 0.5) * 24,
+      heading: random() * Math.PI * 2,
+      wanderAngle: random() * Math.PI * 2,
+      nextTurn: 0.5 + random() * 2,
+      size: 0.78 + random() * 0.45,
+      bobOffset: random() * Math.PI * 2,
       color,
       personality,
-      personalityStrength: 0.55 + Math.random() * 0.9,
-      speedFactor: (0.85 + Math.random() * 0.3) * samplePersonalitySpeedMultiplier(personality),
-      preferredCorner: Math.floor(Math.random() * 4),
+      personalityStrength: 0.55 + random() * 0.9,
+      speedFactor: (0.85 + random() * 0.3) * samplePersonalitySpeedMultiplier(personality, random),
+      preferredCorner: Math.floor(random() * 4),
       specialType: null,
     };
   });
 }
 
-function samplePersonalitySpeedMultiplier(personality: Personality): number {
+function samplePersonalitySpeedMultiplier(personality: Personality, random: RandomSource): number {
   const [minimum, maximum] = PERSONALITIES_BY_ID[personality].speedMultiplier;
-  return minimum === maximum ? minimum : minimum + Math.random() * (maximum - minimum);
+  return minimum === maximum ? minimum : minimum + random() * (maximum - minimum);
 }
 
-export function maybeAssignSpecialType(goober: Goober): void {
-  specialTypeRegistry.assign(goober);
+export function maybeAssignSpecialType(goober: Goober, random: RandomSource = Math.random): void {
+  specialTypeRegistry.assign(goober, random);
 }
 
 function parseHexColor(color: string): [number, number, number] | null {
@@ -85,42 +87,42 @@ const GOLDEN_GOOBER_NAMES = ["shmoober", "doober", "bloober", "scoober", "goldag
 const CHAMELEON_COLOR_RADIUS = 130;
 const CHAMELEON_COLOR_BLEND_RATE = 7.5;
 
-export function createGoldenEventGoober(width: number, height: number): Goober {
-  const goober = createGoobers(1, "#ffcc00", width, height)[0];
-  goober.name = GOLDEN_GOOBER_NAMES[Math.floor(Math.random() * GOLDEN_GOOBER_NAMES.length)];
+export function createGoldenEventGoober(width: number, height: number, random: RandomSource = Math.random): Goober {
+  const goober = createGoobers(1, "#ffcc00", width, height, random)[0];
+  goober.name = GOLDEN_GOOBER_NAMES[Math.floor(random() * GOLDEN_GOOBER_NAMES.length)];
   goober.specialType = "golden";
   goober.isGoldenEventVisitor = true;
   goober.isEventGoober = true;
-  setGooberAtRandomEdge(goober, width, height);
+  setGooberAtRandomEdge(goober, width, height, random);
   return goober;
 }
 
-export function createRainbowEventGoober(width: number, height: number): Goober {
-  const goober = createGoobers(1, "#ff55cc", width, height)[0];
+export function createRainbowEventGoober(width: number, height: number, random: RandomSource = Math.random): Goober {
+  const goober = createGoobers(1, "#ff55cc", width, height, random)[0];
   const names = ["raindrop", "gumdrop", "sherlock", "glainbowber", "monica"];
-  goober.name = names[Math.floor(Math.random() * names.length)];
+  goober.name = names[Math.floor(random() * names.length)];
   goober.specialType = "rainbow";
   goober.isRainbowEventVisitor = true;
   goober.isEventGoober = true;
-  setGooberAtRandomEdge(goober, width, height);
+  setGooberAtRandomEdge(goober, width, height, random);
   return goober;
 }
 
-function setGooberAtRandomEdge(goober: Goober, width: number, height: number): void {
-  const edge = Math.floor(Math.random() * 4);
-  if (edge === 0) { goober.x = 34; goober.y = Math.random() * height; goober.velocityX = Math.abs(goober.velocityX) + 18; }
-  else if (edge === 1) { goober.x = width - 34; goober.y = Math.random() * height; goober.velocityX = -Math.abs(goober.velocityX) - 18; }
-  else if (edge === 2) { goober.x = Math.random() * width; goober.y = 34; goober.velocityY = Math.abs(goober.velocityY) + 18; }
-  else { goober.x = Math.random() * width; goober.y = height - 34; goober.velocityY = -Math.abs(goober.velocityY) - 18; }
+function setGooberAtRandomEdge(goober: Goober, width: number, height: number, random: RandomSource): void {
+  const edge = Math.floor(random() * 4);
+  if (edge === 0) { goober.x = 34; goober.y = random() * height; goober.velocityX = Math.abs(goober.velocityX) + 18; }
+  else if (edge === 1) { goober.x = width - 34; goober.y = random() * height; goober.velocityX = -Math.abs(goober.velocityX) - 18; }
+  else if (edge === 2) { goober.x = random() * width; goober.y = 34; goober.velocityY = Math.abs(goober.velocityY) + 18; }
+  else { goober.x = random() * width; goober.y = height - 34; goober.velocityY = -Math.abs(goober.velocityY) - 18; }
   goober.heading = Math.atan2(goober.velocityY, goober.velocityX);
   goober.wanderAngle = goober.heading;
 }
 
-export function resumeOrderlyPaths(goobers: Goober[]): void {
+export function resumeOrderlyPaths(goobers: Goober[], random: RandomSource = Math.random): void {
   for (const goober of goobers) {
     if (goober.specialType !== "orderly" || !goober.orderlyPattern) continue;
     goober.orderlyRadius ??= 58;
-    initializeOrderlyPath(goober);
+    initializeOrderlyPath(goober, random);
   }
 }
 
@@ -131,6 +133,7 @@ export function stepSimulation(
   height: number,
   fieldEvent?: FieldEvent,
   artistPaints: ArtistPaint[] = [],
+  random: RandomSource = Math.random,
 ): void {
   if (deltaSeconds <= 0) return;
 
@@ -156,9 +159,9 @@ export function stepSimulation(
       stepLeavingGoober(goober, deltaSeconds, width, height);
       continue;
     }
-    if (stepArtistGoober(goober, deltaSeconds, artistPaints)) continue;
+    if (stepArtistGoober(goober, deltaSeconds, artistPaints, random)) continue;
     if (goober.personality === "sleepy") {
-      goober.nextNap ??= 25 + Math.random() * 45;
+      goober.nextNap ??= 25 + random() * 45;
       if ((goober.napRemaining ?? 0) > 0) {
         goober.napRemaining = Math.max(0, goober.napRemaining! - deltaSeconds);
         goober.velocityX *= Math.max(0, 1 - deltaSeconds * 4);
@@ -167,31 +170,14 @@ export function stepSimulation(
       }
       goober.nextNap -= deltaSeconds;
       if (goober.nextNap <= 0) {
-        goober.napRemaining = 3 + Math.random() * 7;
-        goober.nextNap = 25 + Math.random() * 45;
+        goober.napRemaining = 3 + random() * 7;
+        goober.nextNap = 25 + random() * 45;
         goober.velocityX = 0;
         goober.velocityY = 0;
         continue;
       }
     }
-    if (goober.specialType === "chameleon") {
-      let nearestColorSource: Goober | null = null;
-      let nearestDistanceSquared = CHAMELEON_COLOR_RADIUS * CHAMELEON_COLOR_RADIUS;
-      for (const neighbor of goobers) {
-        if (neighbor === goober || neighbor.specialType === "golden" || neighbor.specialType === "rainbow") continue;
-        const dx = neighbor.x - goober.x;
-        const dy = neighbor.y - goober.y;
-        const distanceSquared = dx * dx + dy * dy;
-        if (distanceSquared < nearestDistanceSquared) {
-          nearestColorSource = neighbor;
-          nearestDistanceSquared = distanceSquared;
-        }
-      }
-      if (nearestColorSource) {
-        const blend = 1 - Math.exp(-deltaSeconds * CHAMELEON_COLOR_BLEND_RATE);
-        goober.color = blendHexColors(goober.color, nearestColorSource.color, blend);
-      }
-    }
+    if (goober.specialType === "chameleon") stepChameleonGoober(goober, goobers, deltaSeconds);
     if (fieldEvent?.type === "rainbow-goober" && goober.specialType === "orderly" && (goober.rainbowSpinTurns ?? 0) < 5) {
       goober.heading += deltaSeconds * Math.PI * 4;
       goober.velocityX = 0;
@@ -205,51 +191,18 @@ export function stepSimulation(
     goober.nextTurn -= deltaSeconds;
     if (goober.nextTurn <= 0) {
       const personality = PERSONALITIES_BY_ID[goober.personality];
-      goober.wanderAngle += (Math.random() - 0.5) * personality.turniness * goober.personalityStrength;
+      goober.wanderAngle += (random() - 0.5) * personality.turniness * goober.personalityStrength;
       const [minimumTurn, maximumTurn] = personality.turnInterval;
-      goober.nextTurn = minimumTurn + Math.random() * (maximumTurn - minimumTurn);
+      goober.nextTurn = minimumTurn + random() * (maximumTurn - minimumTurn);
     }
 
-    let steerX = Math.cos(goober.wanderAngle) * 0.42;
-    let steerY = Math.sin(goober.wanderAngle) * 0.42;
-
-    if (goober.personality === "homebody") {
-      goober.homeX ??= goober.x;
-      goober.homeY ??= goober.y;
-      const dx = goober.homeX - goober.x;
-      const dy = goober.homeY - goober.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance > 100) {
-        steerX += (dx / distance) * Math.min((distance - 80) * 0.025, 3);
-        steerY += (dy / distance) * Math.min((distance - 80) * 0.025, 3);
-      }
-    } else if (goober.personality === "explorer") {
-      if (goober.explorerX === undefined || Math.hypot(goober.explorerX - goober.x, goober.explorerY! - goober.y) < 65) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 220 + Math.random() * 300;
-        goober.explorerX = Math.max(60, Math.min(width - 60, goober.x + Math.cos(angle) * distance));
-        goober.explorerY = Math.max(60, Math.min(height - 60, goober.y + Math.sin(angle) * distance));
-      }
-      steerX += (goober.explorerX - goober.x) * 0.018;
-      steerY += (goober.explorerY! - goober.y) * 0.018;
-    } else if (goober.personality === "dizzy") {
-      goober.dizzyPhase = (goober.dizzyPhase ?? 0) + deltaSeconds * 5;
-      steerX += -Math.sin(goober.wanderAngle) * Math.sin(goober.dizzyPhase) * 1.25;
-      steerY += Math.cos(goober.wanderAngle) * Math.sin(goober.dizzyPhase) * 1.25;
-    } else if (goober.personality === "wallflower") {
-      const edgeMargin = 48;
-      const distances = [goober.y, width - goober.x, height - goober.y, goober.x];
-      const edgeIndex = distances.indexOf(Math.min(...distances));
-      const nearestDistance = distances[edgeIndex];
-      const tangent = [0, Math.PI / 2, Math.PI, -Math.PI / 2][edgeIndex];
-      steerX += Math.cos(tangent) * 1.2;
-      steerY += Math.sin(tangent) * 1.2;
-      const edgeForce = Math.min(Math.abs(nearestDistance - edgeMargin) * 0.025, 2.5);
-      const normalAngle = [Math.PI / 2, Math.PI, -Math.PI / 2, 0][edgeIndex];
-      const towardEdge = nearestDistance > edgeMargin ? -1 : 1;
-      steerX += Math.cos(normalAngle) * edgeForce * towardEdge;
-      steerY += Math.sin(normalAngle) * edgeForce * towardEdge;
-    }
+    const steering = {
+      x: Math.cos(goober.wanderAngle) * 0.42,
+      y: Math.sin(goober.wanderAngle) * 0.42,
+    };
+    PERSONALITY_STEERING[goober.personality]({ goober, steering, width, height, deltaSeconds, random });
+    let steerX = steering.x;
+    let steerY = steering.y;
 
     if (goober.personality !== "wallflower") {
       const margin = 82;
@@ -384,7 +337,7 @@ export function stepSimulation(
         const dy = target.y - goober.y;
         const distance = Math.hypot(dx, dy) || 1;
         if (goober.personality === "orbiter") {
-          const direction = goober.orbitDirection ?? (goober.orbitDirection = Math.random() < 0.5 ? -1 : 1);
+          const direction = goober.orbitDirection ?? (goober.orbitDirection = random() < 0.5 ? -1 : 1);
           const radial = (distance - 120) * 0.012;
           steerX += (dx / distance) * radial - (dy / distance) * direction * 1.7;
           steerY += (dy / distance) * radial + (dx / distance) * direction * 1.7;
@@ -569,20 +522,20 @@ function stepLeavingGoober(goober: Goober, deltaSeconds: number, width: number, 
   goober.hasLeftField = goober.x < -clearMargin || goober.x > width + clearMargin || goober.y < -clearMargin || goober.y > height + clearMargin;
 }
 
-function stepArtistGoober(goober: Goober, deltaSeconds: number, artistPaints: ArtistPaint[]): boolean {
+function stepArtistGoober(goober: Goober, deltaSeconds: number, artistPaints: ArtistPaint[], random: RandomSource): boolean {
   if (goober.specialType !== "artist") {
     goober.isArtistPainting = false;
     return false;
   }
 
-  goober.artistNextBreak ??= 25 + Math.random() * 55;
+  goober.artistNextBreak ??= 25 + random() * 55;
   if ((goober.artistBreakRemaining ?? 0) > 0) {
     goober.artistBreakRemaining = Math.max(0, goober.artistBreakRemaining! - deltaSeconds);
   } else {
     goober.artistNextBreak -= deltaSeconds;
     if (goober.artistNextBreak <= 0) {
-      goober.artistBreakRemaining = 5 + Math.random() * 40;
-      goober.artistNextBreak = 25 + Math.random() * 55;
+      goober.artistBreakRemaining = 5 + random() * 40;
+      goober.artistNextBreak = 25 + random() * 55;
     }
   }
 
@@ -622,6 +575,24 @@ function stepArtistGoober(goober: Goober, deltaSeconds: number, artistPaints: Ar
   goober.artistPaintedCell = true;
   goober.isArtistPainting = false;
   return false;
+}
+
+function stepChameleonGoober(goober: Goober, goobers: readonly Goober[], deltaSeconds: number): void {
+  let nearestColorSource: Goober | null = null;
+  let nearestDistanceSquared = CHAMELEON_COLOR_RADIUS * CHAMELEON_COLOR_RADIUS;
+  for (const neighbor of goobers) {
+    if (neighbor === goober || neighbor.specialType === "golden" || neighbor.specialType === "rainbow") continue;
+    const dx = neighbor.x - goober.x;
+    const dy = neighbor.y - goober.y;
+    const distanceSquared = dx * dx + dy * dy;
+    if (distanceSquared < nearestDistanceSquared) {
+      nearestColorSource = neighbor;
+      nearestDistanceSquared = distanceSquared;
+    }
+  }
+  if (!nearestColorSource) return;
+  const blend = 1 - Math.exp(-deltaSeconds * CHAMELEON_COLOR_BLEND_RATE);
+  goober.color = blendHexColors(goober.color, nearestColorSource.color, blend);
 }
 
 function separateCongaGoobers(line: Goober[], width: number, height: number): void {

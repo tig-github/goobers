@@ -1,3 +1,5 @@
+import type { RandomSource } from "./random";
+
 export type FieldEventType = "gathering" | "drift" | "color-parade" | "conga-line" | "golden-goober" | "rainbow-goober" | "gassy";
 
 interface TimedFieldEvent {
@@ -39,6 +41,16 @@ export interface GassyEvent extends TimedFieldEvent {
 
 export type FieldEvent = GatheringEvent | DriftEvent | ColorParadeEvent | CongaLineEvent | GoldenGooberEvent | RainbowGooberEvent | GassyEvent;
 
+export const FIELD_EVENT_DESCRIPTIONS: Readonly<Record<FieldEventType, string>> = {
+  gathering: "goobers are clustering",
+  drift: "a current is sweeping the field",
+  "color-parade": "goobers are finding their colors",
+  "conga-line": "goobers are following the line",
+  "golden-goober": "a golden visitor is wandering through",
+  "rainbow-goober": "goobers are spinning around a rainbow visitor",
+  gassy: "every goober leaves a little trail",
+};
+
 /** Events that temporarily take control of orderly goobers' movement. */
 export function suspendsOrderlyPatterns(event: FieldEvent | undefined): boolean {
   return event?.type === "drift" || event?.type === "color-parade";
@@ -56,11 +68,11 @@ const FIELD_EDGE_PADDING = 100;
 const INITIAL_EVENT_DELAY_SECONDS = 60;
 const RANDOM_EVENT_TYPES: readonly FieldEventType[] = ["gathering", "drift", "color-parade", "conga-line", "golden-goober", "gassy"];
 
-function eventDuration(type: FieldEventType): number {
+function eventDuration(type: FieldEventType, random: RandomSource): number {
   switch (type) {
     case "golden-goober":
     case "rainbow-goober":
-      return GOLDEN_GOOBER_DURATION_SECONDS + (Math.random() * 2 - 1) * GOLDEN_GOOBER_DURATION_VARIATION_SECONDS;
+      return GOLDEN_GOOBER_DURATION_SECONDS + (random() * 2 - 1) * GOLDEN_GOOBER_DURATION_VARIATION_SECONDS;
     case "color-parade":
       return COLOR_PARADE_DURATION_SECONDS;
     case "conga-line":
@@ -74,6 +86,11 @@ export class EventSystem {
   private activeEvent: FieldEvent | null = null;
   private cooldownSeconds = INITIAL_EVENT_DELAY_SECONDS;
   private checkElapsed = 0;
+  private readonly random: RandomSource;
+
+  constructor(random: RandomSource = Math.random) {
+    this.random = random;
+  }
 
   trigger(type: FieldEventType, width: number, height: number): FieldEvent {
     if (type === "gathering") {
@@ -81,12 +98,12 @@ export class EventSystem {
       const verticalRange = Math.max(0, height - FIELD_EDGE_PADDING * 2);
       this.activeEvent = {
         type,
-        x: FIELD_EDGE_PADDING + Math.random() * horizontalRange,
-        y: FIELD_EDGE_PADDING + Math.random() * verticalRange,
+        x: FIELD_EDGE_PADDING + this.random() * horizontalRange,
+        y: FIELD_EDGE_PADDING + this.random() * verticalRange,
         remainingSeconds: EVENT_DURATION_SECONDS,
       };
     } else if (type === "drift") {
-      const angle = Math.random() * Math.PI * 2;
+      const angle = this.random() * Math.PI * 2;
       this.activeEvent = {
         type,
         directionX: Math.cos(angle),
@@ -96,7 +113,7 @@ export class EventSystem {
     } else {
       this.activeEvent = {
         type,
-        remainingSeconds: eventDuration(type),
+        remainingSeconds: eventDuration(type, this.random),
       };
     }
     this.checkElapsed = 0;
@@ -128,8 +145,8 @@ export class EventSystem {
     this.checkElapsed += deltaSeconds;
     while (this.checkElapsed >= EVENT_CHECK_INTERVAL_SECONDS) {
       this.checkElapsed -= EVENT_CHECK_INTERVAL_SECONDS;
-      if (Math.random() < EVENT_CHANCE_PER_CHECK) {
-        const roll = Math.random() * (RANDOM_EVENT_TYPES.length + 0.5);
+      if (this.random() < EVENT_CHANCE_PER_CHECK) {
+        const roll = this.random() * (RANDOM_EVENT_TYPES.length + 0.5);
         const type = roll < RANDOM_EVENT_TYPES.length
           ? RANDOM_EVENT_TYPES[Math.floor(roll)]
           : "rainbow-goober";

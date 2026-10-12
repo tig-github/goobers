@@ -2,26 +2,21 @@ import type { ArtistPaint, Goober } from "./goober";
 import { WORLD_HEIGHT, WORLD_WIDTH } from "./consts";
 import type { FieldEvent } from "./events";
 
+type ColorTrailParticle = { x: number; y: number; time: number; color: string; size: number };
+
 export class ArenaRenderer {
   worldWidth = WORLD_WIDTH;
   worldHeight = WORLD_HEIGHT;
   private zoom = 1;
   private centerX = WORLD_WIDTH / 2;
   private centerY = WORLD_HEIGHT / 2;
-  private followedGooberId: number | null = null;
   private readonly context: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
   private theme: "dark" | "light" = "light";
   private readonly renderedHeadings = new Map<number, number>();
   private readonly portraitHeadings = new Map<number, number>();
-  private readonly rainbowTrails = new Map<
-    number,
-    { x: number; y: number; time: number; color: string; size: number }[]
-  >();
-  private readonly gassyTrails = new Map<
-    number,
-    { x: number; y: number; time: number; color: string; size: number }[]
-  >();
+  private readonly rainbowTrails = new Map<number, ColorTrailParticle[]>();
+  private readonly gassyTrails = new Map<number, ColorTrailParticle[]>();
   private readonly goldenSparkleTrails = new Map<
     number,
     { x: number; y: number; time: number; size: number; rotation: number }[]
@@ -38,11 +33,12 @@ export class ArenaRenderer {
   }
 
   draw(
-    goobers: Goober[],
+    goobers: readonly Goober[],
     elapsed: number,
     selectedId: number | null = null,
     fieldEvent?: FieldEvent,
-    artistPaints: ArtistPaint[] = [],
+    artistPaints: readonly ArtistPaint[] = [],
+    followedGooberId: number | null = null,
   ): void {
     const now = performance.now();
     const delta =
@@ -52,17 +48,15 @@ export class ArenaRenderer {
     this.previousRenderTime = now;
     const headingSmoothing = 1 - Math.exp(-delta * 7);
     const portraitSmoothing = 1 - Math.exp(-delta * 1.8);
-    if (this.followedGooberId !== null) {
+    if (followedGooberId !== null) {
       const followed = goobers.find(
-        (goober) => goober.id === this.followedGooberId,
+        (goober) => goober.id === followedGooberId,
       );
       if (followed) {
         const followSmoothing = 1 - Math.exp(-delta * 8);
         this.centerX += (followed.x - this.centerX) * followSmoothing;
         this.centerY += (followed.y - this.centerY) * followSmoothing;
         this.clampView();
-      } else {
-        this.followedGooberId = null;
       }
     }
     for (const goober of goobers) {
@@ -122,7 +116,7 @@ export class ArenaRenderer {
   pickGoober(
     clientX: number,
     clientY: number,
-    goobers: Goober[],
+    goobers: readonly Goober[],
   ): Goober | undefined {
     const bounds = this.canvas.getBoundingClientRect();
     const viewWidth = this.worldWidth / this.zoom;
@@ -208,10 +202,6 @@ export class ArenaRenderer {
     this.clampView();
   }
 
-  setFollowTarget(gooberId: number | null): void {
-    this.followedGooberId = gooberId;
-  }
-
   panByPixels(deltaX: number, deltaY: number): void {
     if (this.zoom <= 1) return;
     const bounds = this.canvas.getBoundingClientRect();
@@ -243,7 +233,7 @@ export class ArenaRenderer {
   private drawFieldEvent(
     event: FieldEvent,
     elapsed: number,
-    goobers: Goober[],
+    goobers: readonly Goober[],
   ): void {
     if (event.type === "drift") {
       const context = this.context;
@@ -334,7 +324,7 @@ export class ArenaRenderer {
   private drawRainbowTrail(
     fieldEvent: FieldEvent | undefined,
     elapsed: number,
-    goobers: Goober[],
+    goobers: readonly Goober[],
   ): void {
     const rainbows = goobers.filter(
       (goober) => goober.specialType === "rainbow",
@@ -407,7 +397,7 @@ export class ArenaRenderer {
   private drawGassyTrails(
     fieldEvent: FieldEvent | undefined,
     elapsed: number,
-    goobers: Goober[],
+    goobers: readonly Goober[],
   ): void {
     if (fieldEvent?.type !== "gassy") {
       this.gassyTrails.clear();
@@ -463,7 +453,7 @@ export class ArenaRenderer {
   private drawGoldenSparkleTrails(
     fieldEvent: FieldEvent | undefined,
     elapsed: number,
-    goobers: Goober[],
+    goobers: readonly Goober[],
   ): void {
     if (fieldEvent?.type !== "gassy") {
       this.goldenSparkleTrails.clear();
@@ -529,7 +519,7 @@ export class ArenaRenderer {
     context.restore();
   }
 
-  private drawField(artistPaints: ArtistPaint[] = []): void {
+  private drawField(artistPaints: readonly ArtistPaint[] = []): void {
     const context = this.context;
     const light = this.theme === "light";
     context.fillStyle = light ? "#e6edf3" : "#101c24";

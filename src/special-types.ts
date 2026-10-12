@@ -1,15 +1,16 @@
 import type { SpecialGoober, SpecialType } from "./goober";
+import type { RandomSource } from "./random";
 export type { OrderlyPattern, SpecialType } from "./goober";
 
 export const MIN_ORDERLY_RADIUS = 36;
 export const MAX_ORDERLY_RADIUS = 180;
 
-export function randomOrderlyRadius(): number {
-  return MIN_ORDERLY_RADIUS + Math.random() * (MAX_ORDERLY_RADIUS - MIN_ORDERLY_RADIUS);
+export function randomOrderlyRadius(random: RandomSource = Math.random): number {
+  return MIN_ORDERLY_RADIUS + random() * (MAX_ORDERLY_RADIUS - MIN_ORDERLY_RADIUS);
 }
 
-export function initializeOrderlyPath(goober: SpecialGoober): void {
-  const radius = goober.orderlyRadius ?? randomOrderlyRadius();
+export function initializeOrderlyPath(goober: SpecialGoober, random: RandomSource = Math.random): void {
+  const radius = goober.orderlyRadius ?? randomOrderlyRadius(random);
   goober.orderlyRadius = radius;
   if (goober.orderlyPattern === "circle") {
     goober.patternOriginX = goober.x - radius;
@@ -36,6 +37,17 @@ export const SPECIAL_TYPE_CHANCES: Readonly<Record<SpecialType, number>> = {
   artist: 2.5,
 };
 
+type SpecialTypeEffect = (goober: SpecialGoober, random: RandomSource) => void;
+const SPECIAL_TYPE_EFFECTS: Partial<Record<SpecialType, SpecialTypeEffect>> = {
+  tiny: (goober) => { goober.size *= 0.55; },
+  speedy: (goober) => { goober.speedFactor *= 2; },
+  orderly: (goober, random) => {
+    goober.personality = "orderly";
+    goober.orderlyPattern = (["triangle", "circle", "square"] as const)[Math.floor(random() * 3)];
+    initializeOrderlyPath(goober, random);
+  },
+};
+
 export class SpecialTypeRegistry {
   private readonly chances: Readonly<Record<SpecialType, number>>;
 
@@ -47,44 +59,32 @@ export class SpecialTypeRegistry {
     }
   }
 
-  assign(goober: SpecialGoober): void {
-    let roll = Math.random() * 100;
+  assign(goober: SpecialGoober, random: RandomSource = Math.random): void {
+    let roll = random() * 100;
     for (const [type, chance] of Object.entries(this.chances) as [SpecialType, number][]) {
       if (roll >= chance) {
         roll -= chance;
         continue;
       }
-      this.apply(type, goober);
+      this.apply(type, goober, random);
       return;
     }
   }
 
-  assignSpecific(type: SpecialType, goober: SpecialGoober): void {
-    this.apply(type, goober);
+  assignSpecific(type: SpecialType, goober: SpecialGoober, random: RandomSource = Math.random): void {
+    this.apply(type, goober, random);
   }
 
-  private apply(type: SpecialType, goober: SpecialGoober): void {
+  private apply(type: SpecialType, goober: SpecialGoober, random: RandomSource): void {
     goober.specialType = type;
-    switch (type) {
-      case "tiny":
-        goober.size *= 0.55;
-        break;
-      case "speedy":
-        goober.speedFactor *= 2;
-        break;
-      case "orderly":
-        goober.personality = "orderly";
-        goober.orderlyPattern = (["triangle", "circle", "square"] as const)[Math.floor(Math.random() * 3)];
-        initializeOrderlyPath(goober);
-        break;
-    }
+    SPECIAL_TYPE_EFFECTS[type]?.(goober, random);
   }
 }
 
 export const specialTypeRegistry = new SpecialTypeRegistry();
 
-export function applySpecialType(goober: SpecialGoober, type: SpecialType): void {
-  specialTypeRegistry.assignSpecific(type, goober);
+export function applySpecialType(goober: SpecialGoober, type: SpecialType, random: RandomSource = Math.random): void {
+  specialTypeRegistry.assignSpecific(type, goober, random);
 }
 
 

@@ -16,10 +16,10 @@ const BADGES: readonly Badge[] = [
 const PAGE_SIZE = 4;
 
 export class BadgeSystem {
-  private readonly earned = new Set<string>();
   private readonly toggle: HTMLButtonElement;
   private readonly panel: HTMLElement;
   private readonly toasts: HTMLElement;
+  private currentEarned: ReadonlySet<string> = new Set();
   private page = 0;
 
   constructor(
@@ -32,29 +32,28 @@ export class BadgeSystem {
     this.toasts = toasts;
   }
 
-  earn(id: string): void {
-    if (this.earned.has(id)) return;
+  showEarned(id: string, earned: ReadonlySet<string>): void {
     const badge = BADGES.find((item) => item.id === id);
     if (!badge) return;
-    this.earned.add(id);
     this.showToast(badge);
-    this.render();
+    this.render(earned);
   }
 
-  render(): void {
-    const unlocked = this.earned.size > 0;
+  render(earnedBadges: ReadonlySet<string>): void {
+    this.currentEarned = earnedBadges;
+    const unlocked = earnedBadges.size > 0;
     this.toggle.hidden = !unlocked;
     this.toggle.classList.toggle("is-unlocked", unlocked);
     this.panel.hidden = !unlocked || this.panel.hidden;
     this.panel.replaceChildren();
 
     const header = document.createElement("div"); header.className = "notebook-heading";
-    const title = document.createElement("div"); title.innerHTML = `<span class="detail-kicker">FIELD MILESTONES</span><h2>badges · ${this.earned.size}</h2>`;
+    const title = document.createElement("div"); title.innerHTML = `<span class="detail-kicker">FIELD MILESTONES</span><h2>badges · ${earnedBadges.size}</h2>`;
     const close = document.createElement("button"); close.type = "button"; close.className = "detail-close"; close.textContent = "×"; close.setAttribute("aria-label", "Close badges");
-    close.addEventListener("click", () => { this.panel.hidden = true; this.toggle.setAttribute("aria-expanded", "false"); });
+      close.addEventListener("click", () => { this.panel.hidden = true; this.toggle.setAttribute("aria-expanded", "false"); });
     header.append(title, close); this.panel.append(header);
 
-    const earned = BADGES.filter((badge) => this.earned.has(badge.id));
+    const earned = BADGES.filter((badge) => earnedBadges.has(badge.id));
     const pageCount = Math.ceil(earned.length / PAGE_SIZE);
     this.page = Math.min(this.page, Math.max(0, pageCount - 1));
     const list = document.createElement("div"); list.className = "badge-list";
@@ -71,10 +70,10 @@ export class BadgeSystem {
     if (pageCount > 1) {
       const pagination = document.createElement("nav"); pagination.className = "notebook-pagination"; pagination.setAttribute("aria-label", "Badge pages");
       const previous = document.createElement("button"); previous.type = "button"; previous.textContent = "←"; previous.disabled = this.page === 0; previous.setAttribute("aria-label", "Previous badge page");
-      previous.addEventListener("click", () => { this.page--; this.render(); });
+      previous.addEventListener("click", () => { this.page--; this.render(this.currentEarned); });
       const status = document.createElement("span"); status.textContent = `page ${this.page + 1} of ${pageCount}`;
       const next = document.createElement("button"); next.type = "button"; next.textContent = "→"; next.disabled = this.page >= pageCount - 1; next.setAttribute("aria-label", "Next badge page");
-      next.addEventListener("click", () => { this.page++; this.render(); });
+      next.addEventListener("click", () => { this.page++; this.render(this.currentEarned); });
       pagination.append(previous, status, next); this.panel.append(pagination);
     }
   }
